@@ -25,6 +25,8 @@ import Direction3d
 import Block3d
 import Browser.Dom
 import Task
+import Html
+import Html.Attributes
 
 type WorldCoordinates
     = WorldCoordinates
@@ -33,6 +35,8 @@ type WorldCoordinates
 type alias Model =
     { azimuth : Angle -- Orbiting angle of the camera around the focal point
     , elevation : Angle -- Angle of the camera up from the XY plane
+    , hoverAzimuth : Angle -- Orbiting angle of the camera around the focal point
+    , hoverElevation : Angle -- Angle of the camera up from the XY plane
     , dragging : Bool -- Whether the mouse button is currently down
     , mesh1 : Mesh.Plain WorldCoordinates -- Saved Mesh values for rendering
     , mesh2 : Mesh.Plain WorldCoordinates
@@ -45,6 +49,7 @@ type Msg
     | MouseUp
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels)
     | GotViewport Browser.Dom.Viewport
+    | Resize
 
 
 init : () -> ( Model, Cmd Msg )
@@ -68,8 +73,10 @@ init () =
                     (Point3d.meters 0 1 0)
                 ]
     in
-    ( { azimuth = Angle.degrees 100
-      , elevation = Angle.degrees 20
+    ( { azimuth = Angle.degrees 114
+      , elevation = Angle.degrees 23
+      , hoverAzimuth = Angle.degrees 45
+      , hoverElevation = Angle.degrees 200
       , dragging = False
       , mesh1 = mesh1
       , mesh2 = mesh2
@@ -79,11 +86,11 @@ init () =
     )
     
 floor =
-    Scene3d.quad (Material.matte Color.darkGrey)
-        (Point3d.meters -1 -1 -0.1)
-        (Point3d.meters 1 -1 -0.1)
-        (Point3d.meters 1 1 -0.1)
-        (Point3d.meters -1 1 -0.1)
+    Scene3d.quad (Material.matte Color.white)
+        (Point3d.meters -1 -1 -0.3)
+        (Point3d.meters 1 -1 -0.3)
+        (Point3d.meters 1 1 -0.3)
+        (Point3d.meters -1 1 -0.3)
 
 {-| Create a cube entity by constructing six square faces with different colors
 -}
@@ -181,17 +188,20 @@ multiBlock =
     
         rowGridPositions layer =
             List.map (positionInLayer layer)
-                (List.Extra.lift2 Tuple.pair (List.range 0 4) (List.range 0 4))
+                (List.Extra.lift2 Tuple.pair (List.range 0 3) (List.range 0 4))
+
+        blockMaterial color =
+            Material.nonmetal { baseColor = color, roughness = 0}
     
-        row1 = List.map (simpleBlock (Material.matte Color.red)) (rowGridPositions 0)
+        row1 = List.map (simpleBlock (blockMaterial Color.red)) (rowGridPositions 0)
         
-        row2 = List.map (simpleBlock (Material.matte Color.orange)) (rowGridPositions 1)
+        row2 = List.map (simpleBlock (blockMaterial Color.orange)) (rowGridPositions 1)
         
-        row3 = List.map (simpleBlock (Material.matte Color.yellow)) (rowGridPositions 2)
+        row3 = List.map (simpleBlock (blockMaterial Color.yellow)) (rowGridPositions 2)
         
-        row4 = List.map (simpleBlock (Material.matte Color.blue)) (rowGridPositions 3)
+        row4 = List.map (simpleBlock (blockMaterial Color.blue)) (rowGridPositions 3)
         
-        row5 = List.map (simpleBlock (Material.matte Color.green)) (rowGridPositions 4)
+        row5 = List.map (simpleBlock (blockMaterial Color.green)) (rowGridPositions 4)
     in
     Scene3d.group (List.concat [row1, row2, row3, row4, row5])
 
@@ -199,6 +209,8 @@ multiBlock =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
+        Resize ->
+            ( model, Task.perform GotViewport Browser.Dom.getViewport)
         -- Start orbiting when a mouse button is pressed
         MouseDown ->
             ( { model | dragging = True }, Cmd.none )
@@ -209,6 +221,24 @@ update message model =
 
         -- Orbit camera on mouse move (if a mouse button is down)
         MouseMove dx dy x y ->
+            let
+                portionFromXRight =
+                    (model.viewportInfo.viewport.width - (Pixels.toFloat x)) / model.viewportInfo.viewport.width
+
+                hoverAzimuth =
+                    Angle.degrees (90 - ((tiltRange /2) - portionFromXRight * tiltRange))
+
+                -- portion 0 to 1 of mouse position up the viewport
+                portionFromYBottom =
+                    (model.viewportInfo.viewport.height - (Pixels.toFloat y)) / model.viewportInfo.viewport.height
+                
+                tiltRange =
+                    90
+
+                hoverElevation =
+                    Angle.degrees ((tiltRange /2) - portionFromYBottom * tiltRange)
+            in
+            
             if model.dragging then
                 let
                     -- How fast we want to orbit the camera (orbiting the
@@ -232,29 +262,12 @@ update message model =
                             |> Quantity.plus (dy |> Quantity.at rotationRate)
                             |> Quantity.clamp (Angle.degrees -90) (Angle.degrees 90)
                 in
-                ( { model | azimuth = newAzimuth, elevation = newElevation }
+                ( { model | azimuth = newAzimuth, elevation = newElevation, hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation}
                 , Cmd.none
                 )
 
             else
-                let
-                    portionFromXRight =
-                        (model.viewportInfo.viewport.width - (Pixels.toFloat x)) / model.viewportInfo.viewport.width
-
-                    newAzimuth =
-                        Angle.degrees (90 - ((tiltRange /2) - portionFromXRight * tiltRange))
-
-                    -- portion 0 to 1 of mouse position up the viewport
-                    portionFromYBottom =
-                        (model.viewportInfo.viewport.height - (Pixels.toFloat y)) / model.viewportInfo.viewport.height
-                    
-                    tiltRange =
-                        45
-
-                    newElevation =
-                        Angle.degrees ((tiltRange /2) - portionFromYBottom * tiltRange)
-                in
-                ( { model | azimuth = newAzimuth, elevation = newElevation }
+                ( { model | hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation} -- disable for now
                 , Cmd.none
                 )
 
@@ -285,6 +298,7 @@ subscriptions model =
             [ Browser.Events.onMouseMove decodeMouseMove
             , Browser.Events.onMouseUp (Decode.succeed MouseUp)
             , Browser.Events.onMouseDown (Decode.succeed MouseDown)
+            , Browser.Events.onResize (\_ _ -> Resize)
             ]
 
     -- else
@@ -305,10 +319,10 @@ view model =
         -- towards positive Y
         viewpoint =
             Viewpoint3d.orbitZ
-                { focalPoint = Point3d.centimeters (-halfCubeWidth) (halfCubeWidth) (halfCubeWidth)
+                { focalPoint = Point3d.centimeters (-halfCubeWidth + 10) (halfCubeWidth) (cubeRadius * 4 - 3)
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 2
+                , distance = Length.meters 1.8
                 }
 
         camera =
@@ -319,19 +333,27 @@ view model =
     in
     { title = "CCSMM Cube"
     , body =
-        [ Scene3d.sunny
-            { upDirection = Direction3d.positiveZ
-            , sunlightDirection = Direction3d.xyZ model.azimuth (Angle.degrees -150)
-            , shadows = True
-            , camera = camera
-            , clipDepth = Length.meters 0.1
-            , dimensions = ( Pixels.int (round model.viewportInfo.viewport.width), Pixels.int (round model.viewportInfo.viewport.height) )
-            , background = Scene3d.transparentBackground
-            , entities =
-                [ multiBlock
-                -- , floor
-                ]
-            }
+        [ Html.main_ 
+            [ if model.dragging then Html.Attributes.style "cursor" "grabbing" else Html.Attributes.style "cursor" "grab"
+            , Html.Attributes.classList 
+                [ ("aligned", Quantity.equalWithin (Angle.degrees 5) model.azimuth (Angle.degrees 114) && Quantity.equalWithin (Angle.degrees 5) model.elevation (Angle.degrees 23)) ]
+            ]
+            [   Scene3d.sunny
+                { upDirection = Direction3d.positiveZ
+                , sunlightDirection = Direction3d.xyZ 
+                    (Quantity.difference (Quantity.plus model.azimuth (Angle.degrees 45)) model.hoverAzimuth) 
+                    (Quantity.difference (Quantity.plus model.elevation (Angle.degrees 200)) model.hoverElevation) --(Angle.degrees 45) ((Angle.degrees 200)) 
+                , shadows = True
+                , camera = camera
+                , clipDepth = Length.meters 0.1
+                , dimensions = ( Pixels.int (round model.viewportInfo.viewport.width), Pixels.int (round model.viewportInfo.viewport.height) )
+                , background = Scene3d.transparentBackground
+                , entities =
+                    [ multiBlock
+                    -- , floor
+                    ]
+                }
+            ]
         ]
     }
 
