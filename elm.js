@@ -7946,7 +7946,7 @@ var $author$project$Main$update = F2(
 							{ak: newAzimuth, aB: newElevation}),
 						$elm$core$Platform$Cmd$none);
 				} else {
-					var tiltRange = 90;
+					var tiltRange = 45;
 					var portionFromYBottom = (model.ai.aI.bc - $ianmackenzie$elm_units$Pixels$toFloat(y)) / model.ai.aI.bc;
 					var portionFromXRight = (model.ai.aI.br - $ianmackenzie$elm_units$Pixels$toFloat(x)) / model.ai.aI.br;
 					var newElevation = $ianmackenzie$elm_units$Angle$degrees((tiltRange / 2) - (portionFromYBottom * tiltRange));

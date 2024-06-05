@@ -249,7 +249,7 @@ update message model =
                         (model.viewportInfo.viewport.height - (Pixels.toFloat y)) / model.viewportInfo.viewport.height
                     
                     tiltRange =
-                        90
+                        45
 
                     newElevation =
                         Angle.degrees ((tiltRange /2) - portionFromYBottom * tiltRange)
