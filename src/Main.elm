@@ -38,6 +38,9 @@ import Rectangle2d
 import Axis2d
 import Direction2d
 import Point3d exposing (Point3d)
+import Block3d exposing (Block3d)
+import Rectangle2d exposing (Rectangle2d)
+import Length exposing (Meters)
 
 type WorldCoordinates
     = WorldCoordinates
@@ -52,6 +55,10 @@ type alias Model =
     , mesh1 : Mesh.Plain WorldCoordinates -- Saved Mesh values for rendering
     , mesh2 : Mesh.Plain WorldCoordinates
     , viewportInfo : Browser.Dom.Viewport
+    , pointerX : Quantity Float Pixels 
+    , pointerY : Quantity Float Pixels
+    , blockNearMouse : Maybe Block
+    , distance : Quantity Float Meters
     }
 
 
@@ -61,6 +68,7 @@ type Msg
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels)
     | GotViewport Browser.Dom.Viewport
     | Resize
+    | Scroll
 
 
 init : () -> ( Model, Cmd Msg )
@@ -92,6 +100,10 @@ init () =
       , mesh1 = mesh1
       , mesh2 = mesh2
       , viewportInfo = { scene = { width = 800, height = 600}, viewport = { x = 0, y=0, width=800, height=600}}
+      , pointerX = Pixels.float 0
+      , pointerY = Pixels.float 0
+      , blockNearMouse = Nothing
+      , distance = Length.meters 1.8
       }
     , Task.perform GotViewport Browser.Dom.getViewport
     )
@@ -111,8 +123,8 @@ blockWidthY = 10
 
 blockDepthZ = 10
     
-blockToEntity : Block -> Scene3d.Entity Float
-blockToEntity block =
+blockToEntity : Maybe Block -> Block -> Scene3d.Entity Float
+blockToEntity hoverBlock block =
     let
         columnColor =
             case block.column of
@@ -126,7 +138,11 @@ blockToEntity block =
         blockMaterial =
             Material.nonmetal { baseColor = columnColor, roughness = 0}
     in
-    Scene3d.blockWithShadow blockMaterial (block.block3d)
+    if hoverBlock == Just block || hoverBlock == Nothing then
+            Scene3d.blockWithShadow blockMaterial (block.block3d)
+    else
+            Scene3d.point {radius = Pixels.float 10} (Material.color columnColor) block.position
+    
 
 
 
@@ -141,18 +157,19 @@ type alias Aspect =
 
 rows =
     -- four dimensions, bottom to top
-    [ Aspect 0 "Planning"
-    , Aspect 1 "Policy"
+    [ Aspect 3 "Awareness" 
     , Aspect 2 "Information Sharing"
-    , Aspect 3 "Awareness"
+    , Aspect 1 "Policy"
+    , Aspect 0 "Planning"
     ]
 
 depthLayers =
     -- five scopes, front to back
-    [ Aspect 0 "Individual"
-    , Aspect 1 "Organization"
+    [ Aspect 4 "Individual"
+    , Aspect 3 "Organization"
     , Aspect 2 "Community"
-    , Aspect 3 "State"
+    , Aspect 1 "State"
+    , Aspect 0 "Nation"
     ]
 
 
@@ -217,11 +234,59 @@ blockPositionVector column layer row =
                 (blockDepthZ  * toFloat row + toFloat (row*blockGap))
 
 
+entireCube hoverBlock =
+    Scene3d.group <| List.map (blockToEntity hoverBlock) allBlocks 
 
 
+blockNearestToMouse model =
+    let
+        -- Create a viewpoint by orbiting around a Z axis through the given
+        -- focal point, with azimuth measured from the positive X direction
+        -- towards positive Y
+        viewpoint =
+            Viewpoint3d.orbitZ
+                { focalPoint = Point3d.origin
+                , azimuth = model.azimuth
+                , elevation = model.elevation
+                , distance = Length.meters 1.8
+                }
 
-entireCube =
-    Scene3d.group <| List.map blockToEntity allBlocks 
+        camera =
+            Camera3d.perspective
+                { viewpoint = viewpoint
+                , verticalFieldOfView = Angle.degrees 30
+                }
+
+        -- Used for converting from coordinates relative to the bottom-left
+        -- corner of the 2D drawing into coordinates relative to the top-left
+        -- corner (which is what SVG natively works in)
+        topLeftFrame =
+            Frame2d.atPoint (Point2d.xy Quantity.zero (Pixels.float model.viewportInfo.viewport.height))
+                |> Frame2d.reverseY
+
+        -- Defines the shape of the 'screen' that we will be using when
+        -- projecting 3D points into 2D
+        screenRectangle =
+            Rectangle2d.from Point2d.origin (Point2d.pixels model.viewportInfo.viewport.width model.viewportInfo.viewport.height)
+            |> Rectangle2d.relativeTo topLeftFrame
+            
+
+
+        blockDistanceFromPointer block =
+            Point2d.distanceFrom
+                (Point3d.toScreenSpace camera screenRectangle block.position)
+                (Point2d.xy model.pointerX model.pointerY)
+            |> Pixels.toFloat
+
+        blocksWithDistance =
+            List.map (\b -> (blockDistanceFromPointer b, b)) allBlocks
+
+        nearbyBlocksWithDistance =
+            List.filter (\(d, _) -> d < 50) blocksWithDistance
+    in
+    List.Extra.maximumBy Tuple.first nearbyBlocksWithDistance
+    |> Maybe.map Tuple.second
+
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -280,12 +345,14 @@ update message model =
                             |> Quantity.plus (dy |> Quantity.at rotationRate)
                             |> Quantity.clamp (Angle.degrees -90) (Angle.degrees 90)
                 in
-                ( { model | azimuth = newAzimuth, elevation = newElevation, hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation}
+                ( { model | azimuth = newAzimuth, elevation = newElevation, hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation
+                    , pointerX = x, pointerY = y
+                    }
                 , Cmd.none
                 )
 
             else
-                ( { model | hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation} -- disable for now
+                ( { model | hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation, pointerX = x, pointerY = y, blockNearMouse = blockNearestToMouse model} -- disable for now
                 , Cmd.none
                 )
 
@@ -336,7 +403,7 @@ view model =
                 { focalPoint = Point3d.origin
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 1.8
+                , distance = model.distance
                 }
 
         camera =
@@ -367,23 +434,30 @@ view model =
 
         -- Create text SVG labels beside each projected 2D point
         svgLabels =
-            vertices2d
-                |> List.indexedMap
-                    (\index vertex ->
-                        Svg.text_
-                            [ Svg.Attributes.fill "rgb(92, 92, 92)"
-                            , Svg.Attributes.fontFamily "monospace"
-                            , Svg.Attributes.fontSize "20px"
-                            , Svg.Attributes.stroke "none"
-                            , Svg.Attributes.x (String.fromFloat (Pixels.toFloat (Point2d.xCoordinate vertex) + 10))
-                            , Svg.Attributes.y (String.fromFloat (Pixels.toFloat (Point2d.yCoordinate vertex)))
-                            ]
-                            [ Svg.text ("p" ++ String.fromInt index) ]
-                            -- Hack: flip the text upside down since our later
-                            -- 'Svg.relativeTo topLeftFrame' call will flip it
-                            -- back right side up
-                            |> Svg.mirrorAcross (Axis2d.through vertex Direction2d.x)
-                    )
+            List.map blockToSvgLabel allBlocks
+
+        blockToSvgLabel : Block -> Svg msg
+        blockToSvgLabel block =
+            let
+                vertex =
+                    Point3d.toScreenSpace camera screenRectangle block.position
+            in
+            Svg.text_
+                [ Svg.Attributes.fill "rgb(92, 92, 92)"
+                , Svg.Attributes.fontFamily "sans-serif"
+                , Svg.Attributes.fontSize "12px"
+                , Svg.Attributes.stroke "none"
+                , Svg.Attributes.style "user-select: none"
+                , Svg.Attributes.x (String.fromFloat (Pixels.toFloat (Point2d.xCoordinate vertex)))
+                , Svg.Attributes.y (String.fromFloat (Pixels.toFloat (Point2d.yCoordinate vertex)))
+                , Svg.Attributes.width "3em"
+                ]
+                [ Svg.text (block.description) ]
+                -- Hack: flip the text upside down since our later
+                -- 'Svg.relativeTo topLeftFrame' call will flip it
+                -- back right side up
+                |> Svg.mirrorAcross (Axis2d.through vertex Direction2d.x)
+
     in
     { title = "CCSMM Cube"
     , body =
@@ -403,7 +477,7 @@ view model =
                 , dimensions = ( Pixels.int (round model.viewportInfo.viewport.width), Pixels.int (round model.viewportInfo.viewport.height) )
                 , background = Scene3d.transparentBackground
                 , entities =
-                    [ entireCube
+                    [ entireCube model.blockNearMouse
                     -- , floor
                     ]
                 }
