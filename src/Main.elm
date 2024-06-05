@@ -23,6 +23,8 @@ import Triangle3d
 import Viewpoint3d
 import Direction3d
 import Block3d
+import Browser.Dom
+import Task
 
 type WorldCoordinates
     = WorldCoordinates
@@ -31,16 +33,18 @@ type WorldCoordinates
 type alias Model =
     { azimuth : Angle -- Orbiting angle of the camera around the focal point
     , elevation : Angle -- Angle of the camera up from the XY plane
-    , orbiting : Bool -- Whether the mouse button is currently down
+    , dragging : Bool -- Whether the mouse button is currently down
     , mesh1 : Mesh.Plain WorldCoordinates -- Saved Mesh values for rendering
     , mesh2 : Mesh.Plain WorldCoordinates
+    , viewportInfo : Browser.Dom.Viewport
     }
 
 
 type Msg
     = MouseDown
     | MouseUp
-    | MouseMove (Quantity Float Pixels) (Quantity Float Pixels)
+    | MouseMove (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels)
+    | GotViewport Browser.Dom.Viewport
 
 
 init : () -> ( Model, Cmd Msg )
@@ -66,11 +70,12 @@ init () =
     in
     ( { azimuth = Angle.degrees 100
       , elevation = Angle.degrees 20
-      , orbiting = False
+      , dragging = False
       , mesh1 = mesh1
       , mesh2 = mesh2
+      , viewportInfo = { scene = { width = 800, height = 600}, viewport = { x = 0, y=0, width=800, height=600}}
       }
-    , Cmd.none
+    , Task.perform GotViewport Browser.Dom.getViewport
     )
     
 floor =
@@ -196,27 +201,28 @@ update message model =
     case message of
         -- Start orbiting when a mouse button is pressed
         MouseDown ->
-            ( { model | orbiting = True }, Cmd.none )
+            ( { model | dragging = True }, Cmd.none )
 
         -- Stop orbiting when a mouse button is released
         MouseUp ->
-            ( { model | orbiting = False }, Cmd.none )
+            ( { model | dragging = False }, Cmd.none )
 
         -- Orbit camera on mouse move (if a mouse button is down)
-        MouseMove dx dy ->
-            if model.orbiting then
+        MouseMove dx dy x y ->
+            if model.dragging then
                 let
                     -- How fast we want to orbit the camera (orbiting the
                     -- camera by 1 degree per pixel of drag is a decent default
                     -- to start with)
                     rotationRate =
-                        Angle.degrees 1 |> Quantity.per Pixels.pixel
+                        Angle.degrees 0.1 |> Quantity.per Pixels.pixel
 
                     -- Adjust azimuth based on horizontal mouse motion (one
                     -- degree per pixel)
                     newAzimuth =
                         model.azimuth
                             |> Quantity.minus (dx |> Quantity.at rotationRate)
+
 
                     -- Adjust elevation based on vertical mouse motion (one
                     -- degree per pixel), and clamp to make sure camera cannot
@@ -231,7 +237,29 @@ update message model =
                 )
 
             else
-                ( model, Cmd.none )
+                let
+                    portionFromXRight =
+                        (model.viewportInfo.viewport.width - (Pixels.toFloat x)) / model.viewportInfo.viewport.width
+
+                    newAzimuth =
+                        Angle.degrees (90 - ((tiltRange /2) - portionFromXRight * tiltRange))
+
+                    -- portion 0 to 1 of mouse position up the viewport
+                    portionFromYBottom =
+                        (model.viewportInfo.viewport.height - (Pixels.toFloat y)) / model.viewportInfo.viewport.height
+                    
+                    tiltRange =
+                        90
+
+                    newElevation =
+                        Angle.degrees ((tiltRange /2) - portionFromYBottom * tiltRange)
+                in
+                ( { model | azimuth = newAzimuth, elevation = newElevation }
+                , Cmd.none
+                )
+
+        GotViewport viewportInfo ->
+            ( { model | viewportInfo = viewportInfo}, Cmd.none)
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
@@ -239,14 +267,16 @@ mouse position in the model) - not supported in Internet Explorer though
 -}
 decodeMouseMove : Decoder Msg
 decodeMouseMove =
-    Decode.map2 MouseMove
+    Decode.map4 MouseMove
         (Decode.field "movementX" (Decode.map Pixels.float Decode.float))
         (Decode.field "movementY" (Decode.map Pixels.float Decode.float))
+        (Decode.field "clientX" (Decode.map Pixels.float Decode.float))
+        (Decode.field "clientY" (Decode.map Pixels.float Decode.float))
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if model.orbiting then
+    -- if model.orbiting then
         -- If we're currently orbiting, listen for mouse moves and mouse button
         -- up events (to stop orbiting); in a real app we'd probably also want
         -- to listen for page visibility changes to stop orbiting if the user
@@ -254,26 +284,31 @@ subscriptions model =
         Sub.batch
             [ Browser.Events.onMouseMove decodeMouseMove
             , Browser.Events.onMouseUp (Decode.succeed MouseUp)
+            , Browser.Events.onMouseDown (Decode.succeed MouseDown)
             ]
 
-    else
+    -- else
         -- If we're not currently orbiting, just listen for mouse down events
         -- to start orbiting
-        Browser.Events.onMouseDown (Decode.succeed MouseDown)
+        -- Browser.Events.onMouseDown (Decode.succeed MouseDown)
 
 
 view : Model -> Browser.Document Msg
 view model =
     let
+        halfCubeWidth =
+            -- radius to diameter of 2.5 blocks
+            cubeRadius * 5 - 2.5
+
         -- Create a viewpoint by orbiting around a Z axis through the given
         -- focal point, with azimuth measured from the positive X direction
         -- towards positive Y
         viewpoint =
             Viewpoint3d.orbitZ
-                { focalPoint = Point3d.centimeters (cubeRadius * -5) 0 0
+                { focalPoint = Point3d.centimeters (-halfCubeWidth) (halfCubeWidth) (halfCubeWidth)
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 3
+                , distance = Length.meters 2
                 }
 
         camera =
@@ -290,11 +325,11 @@ view model =
             , shadows = True
             , camera = camera
             , clipDepth = Length.meters 0.1
-            , dimensions = ( Pixels.int 800, Pixels.int 800 )
+            , dimensions = ( Pixels.int (round model.viewportInfo.viewport.width), Pixels.int (round model.viewportInfo.viewport.height) )
             , background = Scene3d.transparentBackground
             , entities =
                 [ multiBlock
-                , floor
+                -- , floor
                 ]
             }
         ]
