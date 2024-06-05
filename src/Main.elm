@@ -3,10 +3,15 @@ module Main exposing (main)
 {-| This example shows how you can allow orbiting of a scene by listening for
 mouse events and moving the camera accordingly.
 -}
-
+import Svg exposing (Svg)
+import Svg.Attributes
 import Angle exposing (Angle)
 import Browser
 import List.Extra
+import Geometry.Svg as Svg
+import Frame2d
+import Point2d
+import Frame3d exposing (Frame3d)
 import Browser.Events
 import Camera3d
 import Vector3d exposing (Vector3d)
@@ -15,6 +20,7 @@ import Json.Decode as Decode exposing (Decoder)
 import Length
 import Pixels exposing (Pixels)
 import Point3d
+import Point3d.Projection as Point3d
 import Quantity exposing (Quantity)
 import Scene3d
 import Scene3d.Material as Material
@@ -27,6 +33,11 @@ import Browser.Dom
 import Task
 import Html
 import Html.Attributes
+import Axis3d
+import Rectangle2d
+import Axis2d
+import Direction2d
+import Point3d exposing (Point3d)
 
 type WorldCoordinates
     = WorldCoordinates
@@ -92,118 +103,125 @@ floor =
         (Point3d.meters 1 1 -0.3)
         (Point3d.meters -1 1 -0.3)
 
-{-| Create a cube entity by constructing six square faces with different colors
--}
-initialCube : Scene3d.Entity WorldCoordinates
-initialCube =
+
+    
+blockWidthX = 10
+
+blockWidthY = 10
+
+blockDepthZ = 10
+    
+blockToEntity : Block -> Scene3d.Entity Float
+blockToEntity block =
     let
-        cubeSize = 0.1
-        -- Define the negative and positive X/Y/Z coordinates of a 16 'pixel'
-        -- wide cube centered at the origin (see https://package.elm-lang.org/packages/ianmackenzie/elm-units/latest/Length#cssPixels)
-        negative =
-            Length.meters -cubeSize
+        columnColor =
+            case block.column of
+                0 -> Color.red
+                1 -> Color.orange
+                2 -> Color.yellow
+                3 -> Color.blue
+                4 -> Color.green
+                _ -> Color.black
 
-        positive =
-            Length.meters cubeSize
-
-        -- Define the eight vertices of the cube
-        p1 =
-            Point3d.xyz negative negative negative
-
-        p2 =
-            Point3d.xyz positive negative negative
-
-        p3 =
-            Point3d.xyz positive positive negative
-
-        p4 =
-            Point3d.xyz negative positive negative
-
-        p5 =
-            Point3d.xyz negative negative positive
-
-        p6 =
-            Point3d.xyz positive negative positive
-
-        p7 =
-            Point3d.xyz positive positive positive
-
-        p8 =
-            Point3d.xyz negative positive positive
-
-        -- Create the six faces with different colors
-        bottom =
-            Scene3d.quad (Material.color Color.blue) p1 p2 p3 p4
-
-        top =
-            Scene3d.quad (Material.color Color.blue) p5 p6 p7 p8
-
-        front =
-            Scene3d.quad (Material.color Color.orange) p2 p3 p7 p6
-
-        back =
-            Scene3d.quad (Material.color Color.orange) p1 p4 p8 p5
-
-        left =
-            Scene3d.quad (Material.color Color.green) p1 p2 p6 p5
-
-        right =
-            Scene3d.quad (Material.color Color.green) p4 p3 p7 p8
+        blockMaterial =
+            Material.nonmetal { baseColor = columnColor, roughness = 0}
     in
-    -- Combine all faces into a single entity
-    Scene3d.group [ bottom, top, front, back, left, right ]
-    
-    
-cubeRadius = 5
-    
-simpleBlock : Material.Uniform coordinates -> Vector3d Length.Meters coordinates -> Scene3d.Entity coordinates
-simpleBlock material offsetVector =
-    let
-        negative =
-            Length.centimeters (-cubeRadius)
+    Scene3d.blockWithShadow blockMaterial (block.block3d)
 
-        positive =
-            Length.centimeters (cubeRadius)
-    
-        p1 =
-            Point3d.xyz (negative) negative negative
-                |> Point3d.translateBy offsetVector
 
-        p2 =
-            Point3d.xyz positive positive positive
-                |> Point3d.translateBy offsetVector
-    in
-    Scene3d.blockWithShadow material (Block3d.from p1 p2)
-    
-multiBlock =
-    let
-        gap =
+
+
+blockGap =
             1
-            
-        positionInLayer column (height, depth) =
-            Vector3d.centimeters 
-                (cubeRadius * 2 * (-column) +  ((-column)*gap))
-                (cubeRadius * 2 * toFloat depth + toFloat (depth*gap))
-                (cubeRadius * 2 * toFloat height + toFloat (height*gap))
-    
-        rowGridPositions layer =
-            List.map (positionInLayer layer)
-                (List.Extra.lift2 Tuple.pair (List.range 0 3) (List.range 0 4))
 
-        blockMaterial color =
-            Material.nonmetal { baseColor = color, roughness = 0}
-    
-        row1 = List.map (simpleBlock (blockMaterial Color.red)) (rowGridPositions 0)
-        
-        row2 = List.map (simpleBlock (blockMaterial Color.orange)) (rowGridPositions 1)
-        
-        row3 = List.map (simpleBlock (blockMaterial Color.yellow)) (rowGridPositions 2)
-        
-        row4 = List.map (simpleBlock (blockMaterial Color.blue)) (rowGridPositions 3)
-        
-        row5 = List.map (simpleBlock (blockMaterial Color.green)) (rowGridPositions 4)
+type alias Aspect =
+    { position : Int
+    , label: String
+    }
+
+rows =
+    -- four dimensions, bottom to top
+    [ Aspect 0 "Planning"
+    , Aspect 1 "Policy"
+    , Aspect 2 "Information Sharing"
+    , Aspect 3 "Awareness"
+    ]
+
+depthLayers =
+    -- five scopes, front to back
+    [ Aspect 0 "Individual"
+    , Aspect 1 "Organization"
+    , Aspect 2 "Community"
+    , Aspect 3 "State"
+    ]
+
+
+columns =
+    -- five levels of improvement, left to right
+    [ Aspect 0 "Level 1 (Initial)"
+    , Aspect 1 "Level 2 (Established)"
+    , Aspect 2 "Level 3 (Self-Assessed)"
+    , Aspect 3 "Level 4 (Integrated)"
+    , Aspect 4 "Level 5 (Vanguard)"
+    ]
+
+type alias Block =
+    { column : Int
+    , depthLayer : Int
+    , row : Int
+    , levelLabel : String
+    , scopeLabel : String
+    , dimensionLabel : String
+    , position : Point3d Length.Meters Float
+    , description : String
+    , block3d : Block3d.Block3d Length.Meters Float
+    }
+
+allBlocks =
+    let
+        blockCombos =
+            List.Extra.cartesianProduct [columns, depthLayers, rows]
     in
-    Scene3d.group (List.concat [row1, row2, row3, row4, row5])
+    List.filterMap aspectsToBlock blockCombos
+
+aspectsToBlock : List Aspect -> Maybe Block
+aspectsToBlock aspectList =
+    case aspectList of
+        [col, layer, row] ->
+            let
+                blockVector =
+                    blockPositionVector col.position layer.position row.position
+            in
+            Just <|
+                { column = col.position
+                , depthLayer = layer.position
+                , row = row.position
+                , levelLabel = col.label
+                , scopeLabel = layer.label
+                , dimensionLabel = row.label
+                , position = blockVector
+                , description = col.label ++ " " ++ layer.label ++ " " ++ row.label
+                , block3d = Block3d.centeredOn 
+                    (Frame3d.atPoint blockVector) 
+                    (Length.centimeters blockWidthX, Length.centimeters blockWidthY, Length.centimeters blockDepthZ)
+                }
+
+        _ -> Nothing
+
+                    
+
+blockPositionVector column layer row =
+            Point3d.centimeters 
+                (blockWidthX  * -(toFloat column) +  (-(toFloat column)*blockGap))
+                (blockWidthY  * toFloat layer + toFloat (layer*blockGap))
+                (blockDepthZ  * toFloat row + toFloat (row*blockGap))
+
+
+
+
+
+entireCube =
+    Scene3d.group <| List.map blockToEntity allBlocks 
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -310,16 +328,12 @@ subscriptions model =
 view : Model -> Browser.Document Msg
 view model =
     let
-        halfCubeWidth =
-            -- radius to diameter of 2.5 blocks
-            cubeRadius * 5 - 2.5
-
         -- Create a viewpoint by orbiting around a Z axis through the given
         -- focal point, with azimuth measured from the positive X direction
         -- towards positive Y
         viewpoint =
             Viewpoint3d.orbitZ
-                { focalPoint = Point3d.centimeters (-halfCubeWidth + 10) (halfCubeWidth) (cubeRadius * 4 - 3)
+                { focalPoint = Point3d.origin
                 , azimuth = model.azimuth
                 , elevation = model.elevation
                 , distance = Length.meters 1.8
@@ -330,6 +344,46 @@ view model =
                 { viewpoint = viewpoint
                 , verticalFieldOfView = Angle.degrees 30
                 }
+
+        -- Used for converting from coordinates relative to the bottom-left
+        -- corner of the 2D drawing into coordinates relative to the top-left
+        -- corner (which is what SVG natively works in)
+        topLeftFrame =
+            Frame2d.atPoint (Point2d.xy Quantity.zero (Pixels.float model.viewportInfo.viewport.height))
+                |> Frame2d.reverseY
+
+        -- Defines the shape of the 'screen' that we will be using when
+        -- projecting 3D points into 2D
+        screenRectangle =
+            Rectangle2d.from Point2d.origin (Point2d.pixels model.viewportInfo.viewport.width model.viewportInfo.viewport.height)
+
+        -- Take all vertices of the logo shape, rotate them the same amount as
+        -- the logo itself and then project them into 2D screen space
+        vertices2d =
+            allBlocks
+                |> List.map .position
+                --|> List.map (Point3d.rotateAround Axis3d.z angle)
+                |> List.map (Point3d.toScreenSpace camera screenRectangle)
+
+        -- Create text SVG labels beside each projected 2D point
+        svgLabels =
+            vertices2d
+                |> List.indexedMap
+                    (\index vertex ->
+                        Svg.text_
+                            [ Svg.Attributes.fill "rgb(92, 92, 92)"
+                            , Svg.Attributes.fontFamily "monospace"
+                            , Svg.Attributes.fontSize "20px"
+                            , Svg.Attributes.stroke "none"
+                            , Svg.Attributes.x (String.fromFloat (Pixels.toFloat (Point2d.xCoordinate vertex) + 10))
+                            , Svg.Attributes.y (String.fromFloat (Pixels.toFloat (Point2d.yCoordinate vertex)))
+                            ]
+                            [ Svg.text ("p" ++ String.fromInt index) ]
+                            -- Hack: flip the text upside down since our later
+                            -- 'Svg.relativeTo topLeftFrame' call will flip it
+                            -- back right side up
+                            |> Svg.mirrorAcross (Axis2d.through vertex Direction2d.x)
+                    )
     in
     { title = "CCSMM Cube"
     , body =
@@ -349,11 +403,19 @@ view model =
                 , dimensions = ( Pixels.int (round model.viewportInfo.viewport.width), Pixels.int (round model.viewportInfo.viewport.height) )
                 , background = Scene3d.transparentBackground
                 , entities =
-                    [ multiBlock
+                    [ entireCube
                     -- , floor
                     ]
                 }
             ]
+        , Svg.svg
+                [ Svg.Attributes.width (String.fromFloat model.viewportInfo.viewport.width)
+                , Svg.Attributes.height (String.fromFloat model.viewportInfo.viewport.height)
+                , Svg.Attributes.style "position: absolute; top: 0; left: 0; right: 0; bottom: 0;"
+                ]
+                [ Svg.relativeTo topLeftFrame
+                    (Svg.g [] (svgLabels))
+                ]
         ]
     }
 
