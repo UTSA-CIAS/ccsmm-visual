@@ -338,11 +338,19 @@ aspectLabels model =
                 y = (Pixels.toFloat (Point2d.yCoordinate vertex) + 4)
 
                 fullRotationString = String.fromFloat rotation ++ "," ++ (String.fromFloat x) ++ "," ++ (String.fromFloat y)
+
+                matchesHoverBlock hoverBlock =
+                    if hoverBlock.levelLabel == aspect.label || hoverBlock.scopeLabel == aspect.label || hoverBlock.dimensionLabel == aspect.label then
+                        "bold"
+                    else
+                        "normal"
+                        
             in
             Svg.text_
                 [ Svg.Attributes.fill "rgb(92, 92, 92)"
                 , Svg.Attributes.fontFamily "sans-serif"
                 , Svg.Attributes.fontSize "12px"
+                , Svg.Attributes.fontWeight (Maybe.map matchesHoverBlock model.blockNearMouse |> Maybe.withDefault "normal")
                 , Svg.Attributes.stroke "none"
                 , Svg.Attributes.style "user-select: none"
                 , Svg.Attributes.x (String.fromFloat x)
@@ -563,8 +571,6 @@ view model =
     , body =
         [ Html.main_ 
             [ if model.dragging then Html.Attributes.style "cursor" "grabbing" else Html.Attributes.style "cursor" "grab"
-            , Html.Attributes.classList 
-                [ ("aligned", Quantity.equalWithin (Angle.degrees 5) model.azimuth (Angle.degrees 114) && Quantity.equalWithin (Angle.degrees 5) model.elevation (Angle.degrees 23)) ]
             , Wheel.onWheel Scroll
             ]
             [   Scene3d.sunny

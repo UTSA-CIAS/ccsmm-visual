@@ -14074,6 +14074,7 @@ var $ianmackenzie$elm_units$Quantity$equalWithin = F3(
 var $elm$svg$Svg$Attributes$fill = _VirtualDom_attribute('fill');
 var $elm$svg$Svg$Attributes$fontFamily = _VirtualDom_attribute('font-family');
 var $elm$svg$Svg$Attributes$fontSize = _VirtualDom_attribute('font-size');
+var $elm$svg$Svg$Attributes$fontWeight = _VirtualDom_attribute('font-weight');
 var $ianmackenzie$elm_geometry$Frame2d$atOrigin = $ianmackenzie$elm_geometry$Geometry$Types$Frame2d(
 	{originPoint: $ianmackenzie$elm_geometry$Point2d$origin, xDirection: $ianmackenzie$elm_geometry$Direction2d$x, yDirection: $ianmackenzie$elm_geometry$Direction2d$y});
 var $ianmackenzie$elm_geometry$Direction2d$mirrorAcross = F2(
@@ -14249,6 +14250,9 @@ var $author$project$Main$aspectLabels = function (model) {
 			$ianmackenzie$elm_geometry$Point2d$xCoordinate(vertex)) - 4;
 		var y = $ianmackenzie$elm_units$Pixels$toFloat(
 			$ianmackenzie$elm_geometry$Point2d$yCoordinate(vertex)) + 4;
+		var matchesHoverBlock = function (hoverBlock) {
+			return (_Utils_eq(hoverBlock.levelLabel, aspect.label) || (_Utils_eq(hoverBlock.scopeLabel, aspect.label) || _Utils_eq(hoverBlock.dimensionLabel, aspect.label))) ? 'bold' : 'normal';
+		};
 		var fullRotationString = $elm$core$String$fromFloat(rotation) + (',' + ($elm$core$String$fromFloat(x) + (',' + $elm$core$String$fromFloat(y))));
 		return A2(
 			$ianmackenzie$elm_geometry_svg$Geometry$Svg$mirrorAcross,
@@ -14260,6 +14264,11 @@ var $author$project$Main$aspectLabels = function (model) {
 						$elm$svg$Svg$Attributes$fill('rgb(92, 92, 92)'),
 						$elm$svg$Svg$Attributes$fontFamily('sans-serif'),
 						$elm$svg$Svg$Attributes$fontSize('12px'),
+						$elm$svg$Svg$Attributes$fontWeight(
+						A2(
+							$elm$core$Maybe$withDefault,
+							'normal',
+							A2($elm$core$Maybe$map, matchesHoverBlock, model.blockNearMouse))),
 						$elm$svg$Svg$Attributes$stroke('none'),
 						$elm$svg$Svg$Attributes$style('user-select: none'),
 						$elm$svg$Svg$Attributes$x(
@@ -14340,16 +14349,6 @@ var $ianmackenzie$elm_geometry_svg$Geometry$Svg$circle2d = F2(
 					A2($elm$core$List$cons, r, attributes))),
 			_List_Nil);
 	});
-var $elm$html$Html$Attributes$classList = function (classes) {
-	return $elm$html$Html$Attributes$class(
-		A2(
-			$elm$core$String$join,
-			' ',
-			A2(
-				$elm$core$List$map,
-				$elm$core$Tuple$first,
-				A2($elm$core$List$filter, $elm$core$Tuple$second, classes))));
-};
 var $ianmackenzie$elm_units$Quantity$difference = F2(
 	function (_v0, _v1) {
 		var x = _v0.a;
@@ -18384,21 +18383,6 @@ var $author$project$Main$view = function (model) {
 				_List_fromArray(
 					[
 						model.dragging ? A2($elm$html$Html$Attributes$style, 'cursor', 'grabbing') : A2($elm$html$Html$Attributes$style, 'cursor', 'grab'),
-						$elm$html$Html$Attributes$classList(
-						_List_fromArray(
-							[
-								_Utils_Tuple2(
-								'aligned',
-								A3(
-									$ianmackenzie$elm_units$Quantity$equalWithin,
-									$ianmackenzie$elm_units$Angle$degrees(5),
-									model.azimuth,
-									$ianmackenzie$elm_units$Angle$degrees(114)) && A3(
-									$ianmackenzie$elm_units$Quantity$equalWithin,
-									$ianmackenzie$elm_units$Angle$degrees(5),
-									model.elevation,
-									$ianmackenzie$elm_units$Angle$degrees(23)))
-							])),
 						$mpizenberg$elm_pointer_events$Html$Events$Extra$Wheel$onWheel($author$project$Main$Scroll)
 					]),
 				_List_fromArray(
