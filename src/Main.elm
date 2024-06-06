@@ -211,7 +211,7 @@ aspectsToBlock aspectList =
         [col, layer, row] ->
             let
                 blockVector =
-                    blockPositionVector col.position layer.position row.position
+                    blockPositionVector (toFloat col.position) (toFloat layer.position) (toFloat row.position)
             in
             Just <|
                 { column = col.position
@@ -229,27 +229,25 @@ aspectsToBlock aspectList =
 
         _ -> Nothing
 
-                    
+rowCount = List.length rows        
 
+colCount = List.length columns
+
+layerCount = List.length depthLayers
+
+blockPositionVector : Float -> Float -> Float -> Point3d Meters Float
 blockPositionVector column layer row =
     let
-        rowCount = List.length rows
-
         heightNeeded = toFloat <| ((rowCount - 1) * blockDepthY) + (blockGap * (rowCount - 1))
-
-        colCount = List.length columns
 
         widthNeeded = toFloat <| ((colCount - 1) * blockWidthX) + (blockGap * (colCount - 1))
 
-        layerCount = List.length depthLayers
-
         depthNeeded = toFloat <| ((layerCount - 1) * blockDepthY) + (blockGap * (layerCount - 1))
     in
-    
-            Point3d.centimeters 
-                (blockWidthX  * -(toFloat column) +  (-(toFloat column)*blockGap) + (widthNeeded /2))
-                (blockDepthY  * (toFloat layer) + toFloat (layer*blockGap) - (depthNeeded / 2))
-                (blockHeightZ * (toFloat row) + toFloat (row*blockGap) - (heightNeeded / 2))
+        Point3d.centimeters 
+            (blockWidthX  * -(column) +  (-(column)*blockGap) + (widthNeeded /2))
+            (blockDepthY  * (layer) +  (layer*blockGap) - (depthNeeded / 2))
+            (blockHeightZ * (row) +  (row*blockGap) - (heightNeeded / 2))
 
 
 entireCube hoverBlock =
@@ -275,6 +273,93 @@ blockNearestToMouse model =
 
 
 
+aspectLabels model =
+    let
+        perspectiveBlockingRange = (Angle.degrees 7)
+
+        perspectiveBlocksVerticalRear = Quantity.equalWithin perspectiveBlockingRange (model.elevation) (Angle.degrees 0)
+
+        perspectiveBlocksLayerLabels = Quantity.equalWithin (Angle.degrees 12) (model.elevation) (Angle.degrees 0)
+
+        extraLeftColumn = -0.5
+        extraRightColumn = toFloat colCount - 0.5
+
+        extraTopRow = toFloat rowCount - 0.5
+        
+        extraBottomRow = -0.5
+
+        extraFrontLayer = toFloat layerCount - 0.5
+
+        extraBackLayer = -0.5
+
+        lookingAtLeftSide =
+            Quantity.equalWithin (Angle.degrees 90) (model.azimuth) (Angle.degrees 0)
+
+        (defaultColumn, alignEnd) = 
+            if lookingAtLeftSide then
+                (extraRightColumn, False)
+            else (extraLeftColumn, True)
+
+        lookingAtTop = Quantity.equalWithin (Angle.degrees 90) (model.elevation) (Angle.degrees 90)
+
+        defaultRow = 
+            if lookingAtTop then
+                (extraTopRow)
+            else (extraBottomRow)
+
+        (rotationDegrees, alignRotatedTextEnd) =
+            case (lookingAtLeftSide, lookingAtTop) of
+                (False, False) -> (45, False)
+                (False, True) -> (-45, False)
+                (True, False) -> (-45, True)
+                (True, True) -> (45, True)
+
+        defaultLayerForColumns = 
+            if perspectiveBlocksVerticalRear then
+                extraFrontLayer
+            else extraBackLayer
+
+
+        columnLabelsWithPoints = List.map (\a -> (a, blockPositionVector (toFloat a.position) defaultLayerForColumns defaultRow, rotationDegrees) ) columns
+
+        rowLabelsWithPoints = List.map (\a -> (a, blockPositionVector defaultColumn extraFrontLayer (toFloat a.position), 0)) rows
+
+        layerLabelsWithPoints = if perspectiveBlocksLayerLabels then []
+            else List.map (\a -> (a, blockPositionVector defaultColumn (toFloat a.position) defaultRow, 0)) depthLayers
+    
+        aspectToSvgLabel : (Aspect, Point3d Meters Float, Float) -> Svg msg
+        aspectToSvgLabel (aspect, point, rotation) =
+            let
+                vertex =
+                    Point3d.toScreenSpace (camera model) (screenRectangle model) point
+
+                x = (Pixels.toFloat (Point2d.xCoordinate vertex) - 4)
+
+                y = (Pixels.toFloat (Point2d.yCoordinate vertex) + 4)
+
+                fullRotationString = String.fromFloat rotation ++ "," ++ (String.fromFloat x) ++ "," ++ (String.fromFloat y)
+            in
+            Svg.text_
+                [ Svg.Attributes.fill "rgb(92, 92, 92)"
+                , Svg.Attributes.fontFamily "sans-serif"
+                , Svg.Attributes.fontSize "12px"
+                , Svg.Attributes.stroke "none"
+                , Svg.Attributes.style "user-select: none"
+                , Svg.Attributes.x (String.fromFloat x)
+                , Svg.Attributes.y (String.fromFloat y)
+                , Svg.Attributes.textAnchor (if alignEnd && (rotation == 0) || (rotation /= 0 && alignRotatedTextEnd) then "end" else "start")
+                , Svg.Attributes.transform ("rotate(" ++ fullRotationString ++ ")")
+                ]
+                [ Svg.text (aspect.label) ]
+                -- Hack: flip the text upside down since our later
+                -- 'Svg.relativeTo topLeftFrame' call will flip it
+                -- back right side up
+                |> Svg.mirrorAcross (Axis2d.through vertex Direction2d.x)
+            
+    in
+    List.map aspectToSvgLabel (columnLabelsWithPoints ++ rowLabelsWithPoints ++ layerLabelsWithPoints)
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
@@ -296,6 +381,7 @@ update message model =
 
                 hoverAzimuth =
                     Angle.degrees (90 - ((tiltRange /2) - portionFromXRight * tiltRange))
+                    |> Angle.normalize
 
                 -- portion 0 to 1 of mouse position up the viewport
                 portionFromYBottom =
@@ -306,6 +392,7 @@ update message model =
 
                 hoverElevation =
                     Angle.degrees ((tiltRange /2) - portionFromYBottom * tiltRange)
+                    |> Angle.normalize
             in
             
             if model.dragging then
@@ -320,7 +407,9 @@ update message model =
                     -- degree per pixel)
                     newAzimuth =
                         model.azimuth
-                            |> Quantity.minus (dx |> Quantity.at rotationRate)
+                            |> Quantity.minus (dx |> Quantity.at rotationRate)    
+                            |> Angle.normalize
+                            |> Quantity.clamp (Angle.degrees 20) (Angle.degrees 160)
 
 
                     -- Adjust elevation based on vertical mouse motion (one
@@ -330,6 +419,7 @@ update message model =
                         model.elevation
                             |> Quantity.plus (dy |> Quantity.at rotationRate)
                             |> Quantity.clamp (Angle.degrees -90) (Angle.degrees 90)
+                            |> Angle.normalize
                 in
                 ( { model | azimuth = newAzimuth, elevation = newElevation, hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation
                     , pointerX = x, pointerY = y, blockNearMouse = Nothing
@@ -492,14 +582,14 @@ view model =
                     -- , floor
                     ]
                 }
-            -- , Svg.svg
-            --     [ Svg.Attributes.width (String.fromFloat model.viewportInfo.viewport.width)
-            --     , Svg.Attributes.height (String.fromFloat model.viewportInfo.viewport.height)
-            --     , Svg.Attributes.style "position: absolute; top: 0; left: 0; right: 0; bottom: 0;"
-            --     ]
-            --     [ Svg.relativeTo (topLeftFrame model)
-            --         (Svg.g [] (List.map blockToSvgLabel allBlocks))
-            --     ]
+            , Svg.svg
+                [ Svg.Attributes.width (String.fromFloat model.viewportInfo.viewport.width)
+                , Svg.Attributes.height (String.fromFloat model.viewportInfo.viewport.height)
+                , Svg.Attributes.style "position: absolute; top: 0; left: 0; right: 0; bottom: 0;"
+                ]
+                [ Svg.relativeTo (topLeftFrame model)
+                    (Svg.g [] (aspectLabels model))
+                ]
             ]
         
         ]
