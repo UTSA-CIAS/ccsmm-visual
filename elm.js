@@ -12786,6 +12786,7 @@ var $author$project$Main$init = function (_v0) {
 			distance: $ianmackenzie$elm_units$Length$meters(1.8),
 			dragging: false,
 			elevation: $ianmackenzie$elm_units$Angle$degrees(23),
+			focusedAspect: $elm$core$Maybe$Nothing,
 			hoverAzimuth: $ianmackenzie$elm_units$Angle$degrees(45),
 			hoverElevation: $ianmackenzie$elm_units$Angle$degrees(200),
 			mesh1: mesh1,
@@ -13222,6 +13223,41 @@ var $author$project$Main$allBlocks = function () {
 			[$author$project$Main$columns, $author$project$Main$depthLayers, $author$project$Main$rows]));
 	return A2($elm$core$List$filterMap, $author$project$Main$aspectsToBlock, blockCombos);
 }();
+var $elm$core$Maybe$map = F2(
+	function (f, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return $elm$core$Maybe$Just(
+				f(value));
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	});
+var $author$project$Main$blockMatchesFocusedAspect = F2(
+	function (block, model) {
+		return _Utils_eq(
+			$elm$core$Maybe$Just(block.levelLabel),
+			A2(
+				$elm$core$Maybe$map,
+				function ($) {
+					return $.label;
+				},
+				model.focusedAspect)) || (_Utils_eq(
+			$elm$core$Maybe$Just(block.scopeLabel),
+			A2(
+				$elm$core$Maybe$map,
+				function ($) {
+					return $.label;
+				},
+				model.focusedAspect)) || _Utils_eq(
+			$elm$core$Maybe$Just(block.dimensionLabel),
+			A2(
+				$elm$core$Maybe$map,
+				function ($) {
+					return $.label;
+				},
+				model.focusedAspect)));
+	});
 var $ianmackenzie$elm_3d_camera$Camera3d$Types$Camera3d = function (a) {
 	return {$: 'Camera3d', a: a};
 };
@@ -13547,16 +13583,6 @@ var $elm$core$List$filter = F2(
 				}),
 			_List_Nil,
 			list);
-	});
-var $elm$core$Maybe$map = F2(
-	function (f, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return $elm$core$Maybe$Just(
-				f(value));
-		} else {
-			return $elm$core$Maybe$Nothing;
-		}
 	});
 var $elm_community$list_extra$List$Extra$minimumBy = F2(
 	function (f, ls) {
@@ -13901,6 +13927,19 @@ var $author$project$Main$blockNearestToMouse = function (model) {
 					block.position),
 				A2($ianmackenzie$elm_geometry$Point2d$xy, model.pointerX, model.pointerY)));
 	};
+	var allFocusedBlocks = function () {
+		var _v1 = model.focusedAspect;
+		if (_v1.$ === 'Just') {
+			return A2(
+				$elm$core$List$filter,
+				function (b) {
+					return A2($author$project$Main$blockMatchesFocusedAspect, b, model);
+				},
+				$author$project$Main$allBlocks);
+		} else {
+			return $author$project$Main$allBlocks;
+		}
+	}();
 	var blocksWithDistance = A2(
 		$elm$core$List$map,
 		function (b) {
@@ -13908,7 +13947,7 @@ var $author$project$Main$blockNearestToMouse = function (model) {
 				blockDistanceFromPointer(b),
 				b);
 		},
-		$author$project$Main$allBlocks);
+		allFocusedBlocks);
 	var nearbyBlocksWithDistance = A2(
 		$elm$core$List$filter,
 		function (_v0) {
@@ -14045,7 +14084,7 @@ var $author$project$Main$update = F2(
 						model,
 						{viewportInfo: viewportInfo}),
 					$elm$core$Platform$Cmd$none);
-			default:
+			case 'Scroll':
 				var deltaY = message.a.deltaY;
 				return _Utils_Tuple2(
 					_Utils_update(
@@ -14057,10 +14096,24 @@ var $author$project$Main$update = F2(
 								$ianmackenzie$elm_units$Length$millimeters(deltaY))
 						}),
 					$elm$core$Platform$Cmd$none);
+			default:
+				var aspect = message.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							focusedAspect: (_Utils_eq(model.focusedAspect, $elm$core$Maybe$Nothing) || (!_Utils_eq(
+								model.focusedAspect,
+								$elm$core$Maybe$Just(aspect)))) ? $elm$core$Maybe$Just(aspect) : $elm$core$Maybe$Nothing
+						}),
+					$elm$core$Platform$Cmd$none);
 		}
 	});
 var $author$project$Main$Scroll = function (a) {
 	return {$: 'Scroll', a: a};
+};
+var $author$project$Main$ToggleAspectFocus = function (a) {
+	return {$: 'ToggleAspectFocus', a: a};
 };
 var $ianmackenzie$elm_units$Quantity$equalWithin = F3(
 	function (_v0, _v1, _v2) {
@@ -14162,10 +14215,17 @@ var $ianmackenzie$elm_geometry_svg$Geometry$Svg$mirrorAcross = function (axis) {
 	return $ianmackenzie$elm_geometry_svg$Geometry$Svg$placeIn(
 		A2($ianmackenzie$elm_geometry$Frame2d$mirrorAcross, axis, $ianmackenzie$elm_geometry$Frame2d$atOrigin));
 };
+var $elm$svg$Svg$Events$onClick = function (msg) {
+	return A2(
+		$elm$html$Html$Events$on,
+		'click',
+		$elm$json$Json$Decode$succeed(msg));
+};
 var $elm$svg$Svg$Attributes$stroke = _VirtualDom_attribute('stroke');
 var $elm$svg$Svg$Attributes$style = _VirtualDom_attribute('style');
 var $elm$svg$Svg$text = $elm$virtual_dom$VirtualDom$text;
 var $elm$svg$Svg$Attributes$textAnchor = _VirtualDom_attribute('text-anchor');
+var $elm$svg$Svg$Attributes$textDecoration = _VirtualDom_attribute('text-decoration');
 var $elm$svg$Svg$text_ = $elm$svg$Svg$trustedNode('text');
 var $ianmackenzie$elm_geometry$Geometry$Types$Axis2d = function (a) {
 	return {$: 'Axis2d', a: a};
@@ -14178,15 +14238,14 @@ var $ianmackenzie$elm_geometry$Axis2d$through = F2(
 var $elm$svg$Svg$Attributes$x = _VirtualDom_attribute('x');
 var $elm$svg$Svg$Attributes$y = _VirtualDom_attribute('y');
 var $author$project$Main$aspectLabels = function (model) {
+	var perspectiveBlocksVerticalRear = A3(
+		$ianmackenzie$elm_units$Quantity$equalWithin,
+		$ianmackenzie$elm_units$Angle$degrees(7),
+		model.elevation,
+		$ianmackenzie$elm_units$Angle$degrees(0));
 	var perspectiveBlocksLayerLabels = A3(
 		$ianmackenzie$elm_units$Quantity$equalWithin,
 		$ianmackenzie$elm_units$Angle$degrees(12),
-		model.elevation,
-		$ianmackenzie$elm_units$Angle$degrees(0));
-	var perspectiveBlockingRange = $ianmackenzie$elm_units$Angle$degrees(7);
-	var perspectiveBlocksVerticalRear = A3(
-		$ianmackenzie$elm_units$Quantity$equalWithin,
-		perspectiveBlockingRange,
 		model.elevation,
 		$ianmackenzie$elm_units$Angle$degrees(0));
 	var lookingAtTop = A3(
@@ -14237,10 +14296,13 @@ var $author$project$Main$aspectLabels = function (model) {
 	var _v2 = lookingAtLeftSide ? _Utils_Tuple2(extraRightColumn, false) : _Utils_Tuple2(extraLeftColumn, true);
 	var defaultColumn = _v2.a;
 	var alignEnd = _v2.b;
-	var aspectToSvgLabel = function (_v3) {
-		var aspect = _v3.a;
-		var point = _v3.b;
-		var rotation = _v3.c;
+	var aspectToSvgLabel = function (_v4) {
+		var aspect = _v4.a;
+		var point = _v4.b;
+		var rotation = _v4.c;
+		var weightMatchesHoverBlock = function (hoverBlock) {
+			return (_Utils_eq(hoverBlock.levelLabel, aspect.label) || (_Utils_eq(hoverBlock.scopeLabel, aspect.label) || _Utils_eq(hoverBlock.dimensionLabel, aspect.label))) ? 'bold' : 'normal';
+		};
 		var vertex = A3(
 			$ianmackenzie$elm_3d_camera$Point3d$Projection$toScreenSpace,
 			$author$project$Main$camera(model),
@@ -14250,10 +14312,17 @@ var $author$project$Main$aspectLabels = function (model) {
 			$ianmackenzie$elm_geometry$Point2d$xCoordinate(vertex)) - 4;
 		var y = $ianmackenzie$elm_units$Pixels$toFloat(
 			$ianmackenzie$elm_geometry$Point2d$yCoordinate(vertex)) + 4;
-		var matchesHoverBlock = function (hoverBlock) {
-			return (_Utils_eq(hoverBlock.levelLabel, aspect.label) || (_Utils_eq(hoverBlock.scopeLabel, aspect.label) || _Utils_eq(hoverBlock.dimensionLabel, aspect.label))) ? 'bold' : 'normal';
-		};
 		var fullRotationString = $elm$core$String$fromFloat(rotation) + (',' + ($elm$core$String$fromFloat(x) + (',' + $elm$core$String$fromFloat(y))));
+		var _v3 = _Utils_eq(
+			$elm$core$Maybe$Just(aspect.label),
+			A2(
+				$elm$core$Maybe$map,
+				function ($) {
+					return $.label;
+				},
+				model.focusedAspect)) ? _Utils_Tuple2('20px', 'underline') : _Utils_Tuple2('12px', 'none');
+		var sizeMatchesFocus = _v3.a;
+		var decorationMatchesFocus = _v3.b;
 		return A2(
 			$ianmackenzie$elm_geometry_svg$Geometry$Svg$mirrorAcross,
 			A2($ianmackenzie$elm_geometry$Axis2d$through, vertex, $ianmackenzie$elm_geometry$Direction2d$x),
@@ -14263,14 +14332,17 @@ var $author$project$Main$aspectLabels = function (model) {
 					[
 						$elm$svg$Svg$Attributes$fill('rgb(92, 92, 92)'),
 						$elm$svg$Svg$Attributes$fontFamily('sans-serif'),
-						$elm$svg$Svg$Attributes$fontSize('12px'),
+						$elm$svg$Svg$Attributes$fontSize(sizeMatchesFocus),
 						$elm$svg$Svg$Attributes$fontWeight(
 						A2(
 							$elm$core$Maybe$withDefault,
 							'normal',
-							A2($elm$core$Maybe$map, matchesHoverBlock, model.blockNearMouse))),
+							A2($elm$core$Maybe$map, weightMatchesHoverBlock, model.blockNearMouse))),
+						$elm$svg$Svg$Attributes$textDecoration(decorationMatchesFocus),
 						$elm$svg$Svg$Attributes$stroke('none'),
-						$elm$svg$Svg$Attributes$style('user-select: none'),
+						$elm$svg$Svg$Attributes$style('user-select: none; cursor: pointer'),
+						$elm$svg$Svg$Events$onClick(
+						$author$project$Main$ToggleAspectFocus(aspect)),
 						$elm$svg$Svg$Attributes$x(
 						$elm$core$String$fromFloat(x)),
 						$elm$svg$Svg$Attributes$y(
@@ -16624,7 +16696,137 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Material$color = function (givenColor) {
 		$ianmackenzie$elm_3d_scene$Scene3d$Types$Constant(
 			$ianmackenzie$elm_3d_scene$Scene3d$Material$toVec3(givenColor)));
 };
+var $ianmackenzie$elm_geometry$Geometry$Types$LineSegment3d = function (a) {
+	return {$: 'LineSegment3d', a: a};
+};
+var $ianmackenzie$elm_geometry$LineSegment3d$fromEndpoints = function (givenEndpoints) {
+	return $ianmackenzie$elm_geometry$Geometry$Types$LineSegment3d(givenEndpoints);
+};
+var $ianmackenzie$elm_geometry$LineSegment3d$from = F2(
+	function (givenStartPoint, givenEndPoint) {
+		return $ianmackenzie$elm_geometry$LineSegment3d$fromEndpoints(
+			_Utils_Tuple2(givenStartPoint, givenEndPoint));
+	});
+var $ianmackenzie$elm_geometry$Point3d$xyzIn = F4(
+	function (_v0, _v1, _v2, _v3) {
+		var frame = _v0.a;
+		var x = _v1.a;
+		var y = _v2.a;
+		var z = _v3.a;
+		var _v4 = frame.originPoint;
+		var p0 = _v4.a;
+		var _v5 = frame.zDirection;
+		var k = _v5.a;
+		var _v6 = frame.yDirection;
+		var j = _v6.a;
+		var _v7 = frame.xDirection;
+		var i = _v7.a;
+		return $ianmackenzie$elm_geometry$Geometry$Types$Point3d(
+			{x: ((p0.x + (x * i.x)) + (y * j.x)) + (z * k.x), y: ((p0.y + (x * i.y)) + (y * j.y)) + (z * k.y), z: ((p0.z + (x * i.z)) + (y * j.z)) + (z * k.z)});
+	});
+var $ianmackenzie$elm_geometry$Block3d$edges = function (block) {
+	var localFrame = $ianmackenzie$elm_geometry$Block3d$axes(block);
+	var _v0 = $ianmackenzie$elm_geometry$Block3d$dimensions(block);
+	var xDimension = _v0.a;
+	var yDimension = _v0.b;
+	var zDimension = _v0.c;
+	var positiveX = $ianmackenzie$elm_units$Quantity$half(xDimension);
+	var negativeX = $ianmackenzie$elm_units$Quantity$negate(positiveX);
+	var positiveY = $ianmackenzie$elm_units$Quantity$half(yDimension);
+	var negativeY = $ianmackenzie$elm_units$Quantity$negate(positiveY);
+	var positiveZ = $ianmackenzie$elm_units$Quantity$half(zDimension);
+	var negativeZ = $ianmackenzie$elm_units$Quantity$negate(positiveZ);
+	var p1 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, negativeX, negativeY, negativeZ);
+	var p3 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, negativeX, positiveY, negativeZ);
+	var p5 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, positiveX, negativeY, negativeZ);
+	var p7 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, positiveX, positiveY, negativeZ);
+	var p2 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, negativeX, negativeY, positiveZ);
+	var p4 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, negativeX, positiveY, positiveZ);
+	var p6 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, positiveX, negativeY, positiveZ);
+	var p8 = A4($ianmackenzie$elm_geometry$Point3d$xyzIn, localFrame, positiveX, positiveY, positiveZ);
+	return _List_fromArray(
+		[
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p1, p3),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p3, p4),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p4, p2),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p2, p1),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p1, p5),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p3, p7),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p4, p8),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p2, p6),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p5, p7),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p7, p8),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p8, p6),
+			A2($ianmackenzie$elm_geometry$LineSegment3d$from, p6, p5)
+		]);
+};
 var $avh4$elm_color$Color$green = A4($avh4$elm_color$Color$RgbaSpace, 115 / 255, 210 / 255, 22 / 255, 1.0);
+var $ianmackenzie$elm_3d_scene$Scene3d$Types$LineSegments = F3(
+	function (a, b, c) {
+		return {$: 'LineSegments', a: a, b: b, c: c};
+	});
+var $ianmackenzie$elm_geometry$LineSegment3d$endpoints = function (_v0) {
+	var lineSegmentEndpoints = _v0.a;
+	return lineSegmentEndpoints;
+};
+var $ianmackenzie$elm_geometry$BoundingBox3d$from = F2(
+	function (firstPoint, secondPoint) {
+		var _v0 = secondPoint;
+		var p2 = _v0.a;
+		var x2 = p2.x;
+		var y2 = p2.y;
+		var z2 = p2.z;
+		var _v1 = firstPoint;
+		var p1 = _v1.a;
+		var x1 = p1.x;
+		var y1 = p1.y;
+		var z1 = p1.z;
+		return $ianmackenzie$elm_geometry$Geometry$Types$BoundingBox3d(
+			{
+				maxX: A2($elm$core$Basics$max, x1, x2),
+				maxY: A2($elm$core$Basics$max, y1, y2),
+				maxZ: A2($elm$core$Basics$max, z1, z2),
+				minX: A2($elm$core$Basics$min, x1, x2),
+				minY: A2($elm$core$Basics$min, y1, y2),
+				minZ: A2($elm$core$Basics$min, z1, z2)
+			});
+	});
+var $ianmackenzie$elm_geometry$LineSegment3d$boundingBox = function (lineSegment) {
+	var _v0 = $ianmackenzie$elm_geometry$LineSegment3d$endpoints(lineSegment);
+	var p1 = _v0.a;
+	var p2 = _v0.b;
+	return A2($ianmackenzie$elm_geometry$BoundingBox3d$from, p1, p2);
+};
+var $ianmackenzie$elm_3d_scene$Scene3d$Mesh$lineSegmentAttributes = function (givenSegment) {
+	var _v0 = $ianmackenzie$elm_geometry$LineSegment3d$endpoints(givenSegment);
+	var p1 = _v0.a;
+	var p2 = _v0.b;
+	return _Utils_Tuple2(
+		$ianmackenzie$elm_3d_scene$Scene3d$Mesh$plainVertex(p1),
+		$ianmackenzie$elm_3d_scene$Scene3d$Mesh$plainVertex(p2));
+};
+var $elm_explorations$webgl$WebGL$Mesh2 = F2(
+	function (a, b) {
+		return {$: 'Mesh2', a: a, b: b};
+	});
+var $elm_explorations$webgl$WebGL$lines = $elm_explorations$webgl$WebGL$Mesh2(
+	{elemSize: 2, indexSize: 0, mode: 1});
+var $ianmackenzie$elm_3d_scene$Scene3d$Mesh$lineSegments = function (givenSegments) {
+	if (!givenSegments.b) {
+		return $ianmackenzie$elm_3d_scene$Scene3d$Types$EmptyMesh;
+	} else {
+		var first = givenSegments.a;
+		var rest = givenSegments.b;
+		var webGLMesh = $elm_explorations$webgl$WebGL$lines(
+			A2($elm$core$List$map, $ianmackenzie$elm_3d_scene$Scene3d$Mesh$lineSegmentAttributes, givenSegments));
+		var bounds = A3($ianmackenzie$elm_geometry$BoundingBox3d$aggregateOf, $ianmackenzie$elm_geometry$LineSegment3d$boundingBox, first, rest);
+		return A3($ianmackenzie$elm_3d_scene$Scene3d$Types$LineSegments, bounds, givenSegments, webGLMesh);
+	}
+};
+var $ianmackenzie$elm_3d_scene$Scene3d$mesh = F2(
+	function (givenMaterial, givenMesh) {
+		return A2($ianmackenzie$elm_3d_scene$Scene3d$Entity$mesh, givenMaterial, givenMesh);
+	});
 var $ianmackenzie$elm_3d_scene$Scene3d$Types$PbrMaterial = F5(
 	function (a, b, c, d, e) {
 		return {$: 'PbrMaterial', a: a, b: b, c: c, d: d, e: e};
@@ -16781,7 +16983,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$point = F3(
 var $avh4$elm_color$Color$red = A4($avh4$elm_color$Color$RgbaSpace, 204 / 255, 0 / 255, 0 / 255, 1.0);
 var $avh4$elm_color$Color$yellow = A4($avh4$elm_color$Color$RgbaSpace, 237 / 255, 212 / 255, 0 / 255, 1.0);
 var $author$project$Main$blockToEntity = F2(
-	function (hoverBlock, block) {
+	function (model, block) {
 		var columnColor = function () {
 			var _v0 = block.column;
 			switch (_v0) {
@@ -16801,24 +17003,34 @@ var $author$project$Main$blockToEntity = F2(
 		}();
 		var blockMaterial = $ianmackenzie$elm_3d_scene$Scene3d$Material$nonmetal(
 			{baseColor: columnColor, roughness: 0});
-		return (_Utils_eq(
-			hoverBlock,
-			$elm$core$Maybe$Just(block)) || _Utils_eq(hoverBlock, $elm$core$Maybe$Nothing)) ? A2($ianmackenzie$elm_3d_scene$Scene3d$blockWithShadow, blockMaterial, block.block3d) : A3(
+		return _Utils_eq(
+			model.blockNearMouse,
+			$elm$core$Maybe$Just(block)) ? A2($ianmackenzie$elm_3d_scene$Scene3d$blockWithShadow, blockMaterial, block.block3d) : (A2($author$project$Main$blockMatchesFocusedAspect, block, model) ? A2(
+			$ianmackenzie$elm_3d_scene$Scene3d$mesh,
+			$ianmackenzie$elm_3d_scene$Scene3d$Material$color(columnColor),
+			$ianmackenzie$elm_3d_scene$Scene3d$Mesh$lineSegments(
+				$ianmackenzie$elm_geometry$Block3d$edges(block.block3d))) : ((_Utils_eq(model.blockNearMouse, $elm$core$Maybe$Nothing) && _Utils_eq(model.focusedAspect, $elm$core$Maybe$Nothing)) ? A2($ianmackenzie$elm_3d_scene$Scene3d$blockWithShadow, blockMaterial, block.block3d) : (_Utils_eq(model.focusedAspect, $elm$core$Maybe$Nothing) ? A3(
 			$ianmackenzie$elm_3d_scene$Scene3d$point,
 			{
 				radius: $ianmackenzie$elm_units$Pixels$float(10)
 			},
 			$ianmackenzie$elm_3d_scene$Scene3d$Material$color(columnColor),
-			block.position);
+			block.position) : A3(
+			$ianmackenzie$elm_3d_scene$Scene3d$point,
+			{
+				radius: $ianmackenzie$elm_units$Pixels$float(1)
+			},
+			$ianmackenzie$elm_3d_scene$Scene3d$Material$color(columnColor),
+			block.position))));
 	});
 var $ianmackenzie$elm_3d_scene$Scene3d$group = function (entities) {
 	return $ianmackenzie$elm_3d_scene$Scene3d$Entity$group(entities);
 };
-var $author$project$Main$entireCube = function (hoverBlock) {
+var $author$project$Main$entireCube = function (model) {
 	return $ianmackenzie$elm_3d_scene$Scene3d$group(
 		A2(
 			$elm$core$List$map,
-			$author$project$Main$blockToEntity(hoverBlock),
+			$author$project$Main$blockToEntity(model),
 			$author$project$Main$allBlocks));
 };
 var $elm$svg$Svg$Attributes$height = _VirtualDom_attribute('height');
@@ -18399,7 +18611,7 @@ var $author$project$Main$view = function (model) {
 									$elm$core$Basics$round(model.viewportInfo.viewport.height))),
 							entities: _List_fromArray(
 								[
-									$author$project$Main$entireCube(model.blockNearMouse)
+									$author$project$Main$entireCube(model)
 								]),
 							shadows: true,
 							sunlightDirection: A2(
@@ -18448,4 +18660,4 @@ var $author$project$Main$view = function (model) {
 var $author$project$Main$main = $elm$browser$Browser$document(
 	{init: $author$project$Main$init, subscriptions: $author$project$Main$subscriptions, update: $author$project$Main$update, view: $author$project$Main$view});
 _Platform_export({'Main':{'init':$author$project$Main$main(
-	$elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.1"},"types":{"message":"Main.Msg","aliases":{"Html.Events.Extra.Mouse.Event":{"args":[],"type":"{ keys : Html.Events.Extra.Mouse.Keys, button : Html.Events.Extra.Mouse.Button, clientPos : ( Basics.Float, Basics.Float ), offsetPos : ( Basics.Float, Basics.Float ), pagePos : ( Basics.Float, Basics.Float ), screenPos : ( Basics.Float, Basics.Float ) }"},"Html.Events.Extra.Wheel.Event":{"args":[],"type":"{ mouseEvent : Html.Events.Extra.Mouse.Event, deltaY : Basics.Float, deltaMode : Html.Events.Extra.Wheel.DeltaMode }"},"Html.Events.Extra.Mouse.Keys":{"args":[],"type":"{ alt : Basics.Bool, ctrl : Basics.Bool, meta : Basics.Bool, shift : Basics.Bool }"},"Browser.Dom.Viewport":{"args":[],"type":"{ scene : { width : Basics.Float, height : Basics.Float }, viewport : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float } }"}},"unions":{"Main.Msg":{"args":[],"tags":{"MouseDown":[],"MouseUp":[],"MouseMove":["Quantity.Quantity Basics.Float Pixels.Pixels","Quantity.Quantity Basics.Float Pixels.Pixels","Quantity.Quantity Basics.Float Pixels.Pixels","Quantity.Quantity Basics.Float Pixels.Pixels"],"GotViewport":["Browser.Dom.Viewport"],"Resize":[],"Scroll":["Html.Events.Extra.Wheel.Event"]}},"Basics.Bool":{"args":[],"tags":{"True":[],"False":[]}},"Html.Events.Extra.Mouse.Button":{"args":[],"tags":{"ErrorButton":[],"MainButton":[],"MiddleButton":[],"SecondButton":[],"BackButton":[],"ForwardButton":[]}},"Html.Events.Extra.Wheel.DeltaMode":{"args":[],"tags":{"DeltaPixel":[],"DeltaLine":[],"DeltaPage":[]}},"Basics.Float":{"args":[],"tags":{"Float":[]}},"Pixels.Pixels":{"args":[],"tags":{"Pixels":[]}},"Quantity.Quantity":{"args":["number","units"],"tags":{"Quantity":["number"]}}}}})}});}(this));
+	$elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.1"},"types":{"message":"Main.Msg","aliases":{"Main.Aspect":{"args":[],"type":"{ position : Basics.Int, label : String.String }"},"Html.Events.Extra.Mouse.Event":{"args":[],"type":"{ keys : Html.Events.Extra.Mouse.Keys, button : Html.Events.Extra.Mouse.Button, clientPos : ( Basics.Float, Basics.Float ), offsetPos : ( Basics.Float, Basics.Float ), pagePos : ( Basics.Float, Basics.Float ), screenPos : ( Basics.Float, Basics.Float ) }"},"Html.Events.Extra.Wheel.Event":{"args":[],"type":"{ mouseEvent : Html.Events.Extra.Mouse.Event, deltaY : Basics.Float, deltaMode : Html.Events.Extra.Wheel.DeltaMode }"},"Html.Events.Extra.Mouse.Keys":{"args":[],"type":"{ alt : Basics.Bool, ctrl : Basics.Bool, meta : Basics.Bool, shift : Basics.Bool }"},"Browser.Dom.Viewport":{"args":[],"type":"{ scene : { width : Basics.Float, height : Basics.Float }, viewport : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float } }"}},"unions":{"Main.Msg":{"args":[],"tags":{"MouseDown":[],"MouseUp":[],"MouseMove":["Quantity.Quantity Basics.Float Pixels.Pixels","Quantity.Quantity Basics.Float Pixels.Pixels","Quantity.Quantity Basics.Float Pixels.Pixels","Quantity.Quantity Basics.Float Pixels.Pixels"],"GotViewport":["Browser.Dom.Viewport"],"Resize":[],"Scroll":["Html.Events.Extra.Wheel.Event"],"ToggleAspectFocus":["Main.Aspect"]}},"Basics.Bool":{"args":[],"tags":{"True":[],"False":[]}},"Html.Events.Extra.Mouse.Button":{"args":[],"tags":{"ErrorButton":[],"MainButton":[],"MiddleButton":[],"SecondButton":[],"BackButton":[],"ForwardButton":[]}},"Html.Events.Extra.Wheel.DeltaMode":{"args":[],"tags":{"DeltaPixel":[],"DeltaLine":[],"DeltaPage":[]}},"Basics.Float":{"args":[],"tags":{"Float":[]}},"Basics.Int":{"args":[],"tags":{"Int":[]}},"Pixels.Pixels":{"args":[],"tags":{"Pixels":[]}},"Quantity.Quantity":{"args":["number","units"],"tags":{"Quantity":["number"]}},"String.String":{"args":[],"tags":{"String":[]}}}}})}});}(this));

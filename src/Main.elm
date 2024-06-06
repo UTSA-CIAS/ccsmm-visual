@@ -44,6 +44,7 @@ import Rectangle2d exposing (Rectangle2d)
 import Length exposing (Meters)
 import Polyline3d exposing (Polyline3d)
 import Circle2d
+import Svg.Events
 
 type WorldCoordinates
     = WorldCoordinates
@@ -62,6 +63,7 @@ type alias Model =
     , pointerY : Quantity Float Pixels
     , blockNearMouse : Maybe Block
     , distance : Quantity Float Meters
+    , focusedAspect : Maybe Aspect
     }
 
 
@@ -72,6 +74,7 @@ type Msg
     | GotViewport Browser.Dom.Viewport
     | Resize
     | Scroll Wheel.Event
+    | ToggleAspectFocus Aspect
 
 
 init : () -> ( Model, Cmd Msg )
@@ -107,6 +110,7 @@ init () =
       , pointerY = Pixels.float 0
       , blockNearMouse = Nothing
       , distance = Length.meters 1.8
+      , focusedAspect = Nothing
       }
     , Task.perform GotViewport Browser.Dom.getViewport
     )
@@ -126,8 +130,8 @@ blockHeightZ = 10
 
 blockDepthY = 10
     
-blockToEntity : Maybe Block -> Block -> Scene3d.Entity Float
-blockToEntity hoverBlock block =
+blockToEntity : Model -> Block -> Scene3d.Entity Float
+blockToEntity model block =
     let
         columnColor =
             case block.column of
@@ -141,13 +145,29 @@ blockToEntity hoverBlock block =
         blockMaterial =
             Material.nonmetal { baseColor = columnColor, roughness = 0}
     in
-    if hoverBlock == Just block || hoverBlock == Nothing then
+    if model.blockNearMouse == Just block
+    then
             Scene3d.blockWithShadow blockMaterial (block.block3d)
+    
+    else if blockMatchesFocusedAspect block model
+    then
+        Scene3d.mesh (Material.color columnColor) <| Mesh.lineSegments  <| Block3d.edges block.block3d
+    
+    else if model.blockNearMouse == Nothing && model.focusedAspect == Nothing
+    then
+        Scene3d.blockWithShadow blockMaterial (block.block3d)
+    
+    else if model.focusedAspect == Nothing
+    then
+        Scene3d.point {radius = Pixels.float 10} (Material.color columnColor) block.position
     else
-            -- Scene3d.mesh (Material.color columnColor) <| Mesh.lineSegments  <| Block3d.edges block.block3d
-            Scene3d.point {radius = Pixels.float 10} (Material.color columnColor) block.position
+        Scene3d.point {radius = Pixels.float 1} (Material.color columnColor) block.position
     
 
+blockMatchesFocusedAspect block model =
+    Just block.levelLabel == Maybe.map .label model.focusedAspect
+        || Just block.scopeLabel == Maybe.map .label model.focusedAspect
+        || Just block.dimensionLabel == Maybe.map .label model.focusedAspect
 
 
 
@@ -250,12 +270,20 @@ blockPositionVector column layer row =
             (blockHeightZ * (row) +  (row*blockGap) - (heightNeeded / 2))
 
 
-entireCube hoverBlock =
-    Scene3d.group <| List.map (blockToEntity hoverBlock) allBlocks 
+entireCube model =
+    Scene3d.group <| List.map (blockToEntity model) allBlocks 
 
 
 blockNearestToMouse model =
     let
+        allFocusedBlocks =
+            case model.focusedAspect of
+                Just _ ->
+                    List.filter (\b -> blockMatchesFocusedAspect b model) allBlocks
+
+                Nothing ->
+                    allBlocks
+
         blockDistanceFromPointer block =
             Point2d.distanceFrom
                 (Point3d.toScreenSpace (camera model) (screenRectangle model |> Rectangle2d.relativeTo (topLeftFrame model)) block.position)
@@ -263,7 +291,7 @@ blockNearestToMouse model =
             |> Pixels.toFloat
 
         blocksWithDistance =
-            List.map (\b -> (blockDistanceFromPointer b, b)) allBlocks
+            List.map (\b -> (blockDistanceFromPointer b, b)) allFocusedBlocks
 
         nearbyBlocksWithDistance =
             List.filter (\(d, _) -> d < 100) blocksWithDistance
@@ -275,9 +303,7 @@ blockNearestToMouse model =
 
 aspectLabels model =
     let
-        perspectiveBlockingRange = (Angle.degrees 7)
-
-        perspectiveBlocksVerticalRear = Quantity.equalWithin perspectiveBlockingRange (model.elevation) (Angle.degrees 0)
+        perspectiveBlocksVerticalRear = Quantity.equalWithin (Angle.degrees 7) (model.elevation) (Angle.degrees 0)
 
         perspectiveBlocksLayerLabels = Quantity.equalWithin (Angle.degrees 12) (model.elevation) (Angle.degrees 0)
 
@@ -327,7 +353,7 @@ aspectLabels model =
         layerLabelsWithPoints = if perspectiveBlocksLayerLabels then []
             else List.map (\a -> (a, blockPositionVector defaultColumn (toFloat a.position) defaultRow, 0)) depthLayers
     
-        aspectToSvgLabel : (Aspect, Point3d Meters Float, Float) -> Svg msg
+        aspectToSvgLabel : (Aspect, Point3d Meters Float, Float) -> Svg Msg
         aspectToSvgLabel (aspect, point, rotation) =
             let
                 vertex =
@@ -339,20 +365,28 @@ aspectLabels model =
 
                 fullRotationString = String.fromFloat rotation ++ "," ++ (String.fromFloat x) ++ "," ++ (String.fromFloat y)
 
-                matchesHoverBlock hoverBlock =
+                weightMatchesHoverBlock hoverBlock =
                     if hoverBlock.levelLabel == aspect.label || hoverBlock.scopeLabel == aspect.label || hoverBlock.dimensionLabel == aspect.label then
                         "bold"
                     else
                         "normal"
+
+                (sizeMatchesFocus, decorationMatchesFocus) =
+                    if Just aspect.label == Maybe.map .label model.focusedAspect then
+                        ("20px", "underline")
+                    else
+                        ("12px", "none")
                         
             in
             Svg.text_
                 [ Svg.Attributes.fill "rgb(92, 92, 92)"
                 , Svg.Attributes.fontFamily "sans-serif"
-                , Svg.Attributes.fontSize "12px"
-                , Svg.Attributes.fontWeight (Maybe.map matchesHoverBlock model.blockNearMouse |> Maybe.withDefault "normal")
+                , Svg.Attributes.fontSize sizeMatchesFocus
+                , Svg.Attributes.fontWeight (Maybe.map weightMatchesHoverBlock model.blockNearMouse |> Maybe.withDefault "normal")
+                , Svg.Attributes.textDecoration decorationMatchesFocus
                 , Svg.Attributes.stroke "none"
-                , Svg.Attributes.style "user-select: none"
+                , Svg.Attributes.style "user-select: none; cursor: pointer"
+                , Svg.Events.onClick (ToggleAspectFocus aspect)
                 , Svg.Attributes.x (String.fromFloat x)
                 , Svg.Attributes.y (String.fromFloat y)
                 , Svg.Attributes.textAnchor (if alignEnd && (rotation == 0) || (rotation /= 0 && alignRotatedTextEnd) then "end" else "start")
@@ -451,6 +485,13 @@ update message model =
 
         Scroll {deltaY} ->
             ( { model | distance = Quantity.plus model.distance (Length.millimeters deltaY) }, Cmd.none)
+
+        ToggleAspectFocus aspect ->
+            ( { model | focusedAspect = 
+                if model.focusedAspect == Nothing || model.focusedAspect /= Just aspect then 
+                    Just aspect 
+                else Nothing
+                }, Cmd.none)
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
@@ -584,7 +625,7 @@ view model =
                 , dimensions = ( Pixels.int (round model.viewportInfo.viewport.width), Pixels.int (round model.viewportInfo.viewport.height) )
                 , background = Scene3d.transparentBackground
                 , entities =
-                    [ entireCube model.blockNearMouse
+                    [ entireCube model
                     -- , floor
                     ]
                 }
