@@ -6,6 +6,7 @@ mouse events and moving the camera accordingly.
 import Svg exposing (Svg)
 import Svg.Attributes
 import Angle exposing (Angle)
+import Html.Events.Extra.Wheel as Wheel
 import Browser
 import List.Extra
 import Geometry.Svg as Svg
@@ -41,6 +42,8 @@ import Point3d exposing (Point3d)
 import Block3d exposing (Block3d)
 import Rectangle2d exposing (Rectangle2d)
 import Length exposing (Meters)
+import Polyline3d exposing (Polyline3d)
+import Circle2d
 
 type WorldCoordinates
     = WorldCoordinates
@@ -68,7 +71,7 @@ type Msg
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels) (Quantity Float Pixels)
     | GotViewport Browser.Dom.Viewport
     | Resize
-    | Scroll
+    | Scroll Wheel.Event
 
 
 init : () -> ( Model, Cmd Msg )
@@ -119,9 +122,9 @@ floor =
     
 blockWidthX = 10
 
-blockWidthY = 10
+blockHeightZ = 10
 
-blockDepthZ = 10
+blockDepthY = 10
     
 blockToEntity : Maybe Block -> Block -> Scene3d.Entity Float
 blockToEntity hoverBlock block =
@@ -141,6 +144,7 @@ blockToEntity hoverBlock block =
     if hoverBlock == Just block || hoverBlock == Nothing then
             Scene3d.blockWithShadow blockMaterial (block.block3d)
     else
+            -- Scene3d.mesh (Material.color columnColor) <| Mesh.lineSegments  <| Block3d.edges block.block3d
             Scene3d.point {radius = Pixels.float 10} (Material.color columnColor) block.position
     
 
@@ -220,7 +224,7 @@ aspectsToBlock aspectList =
                 , description = col.label ++ " " ++ layer.label ++ " " ++ row.label
                 , block3d = Block3d.centeredOn 
                     (Frame3d.atPoint blockVector) 
-                    (Length.centimeters blockWidthX, Length.centimeters blockWidthY, Length.centimeters blockDepthZ)
+                    (Length.centimeters blockWidthX, Length.centimeters blockHeightZ, Length.centimeters blockDepthY)
                 }
 
         _ -> Nothing
@@ -228,10 +232,24 @@ aspectsToBlock aspectList =
                     
 
 blockPositionVector column layer row =
+    let
+        rowCount = List.length rows
+
+        heightNeeded = toFloat <| ((rowCount - 1) * blockDepthY) + (blockGap * (rowCount - 1))
+
+        colCount = List.length columns
+
+        widthNeeded = toFloat <| ((colCount - 1) * blockWidthX) + (blockGap * (colCount - 1))
+
+        layerCount = List.length depthLayers
+
+        depthNeeded = toFloat <| ((layerCount - 1) * blockDepthY) + (blockGap * (layerCount - 1))
+    in
+    
             Point3d.centimeters 
-                (blockWidthX  * -(toFloat column) +  (-(toFloat column)*blockGap))
-                (blockWidthY  * toFloat layer + toFloat (layer*blockGap))
-                (blockDepthZ  * toFloat row + toFloat (row*blockGap))
+                (blockWidthX  * -(toFloat column) +  (-(toFloat column)*blockGap) + (widthNeeded /2))
+                (blockDepthY  * (toFloat layer) + toFloat (layer*blockGap) - (depthNeeded / 2))
+                (blockHeightZ * (toFloat row) + toFloat (row*blockGap) - (heightNeeded / 2))
 
 
 entireCube hoverBlock =
@@ -240,41 +258,9 @@ entireCube hoverBlock =
 
 blockNearestToMouse model =
     let
-        -- Create a viewpoint by orbiting around a Z axis through the given
-        -- focal point, with azimuth measured from the positive X direction
-        -- towards positive Y
-        viewpoint =
-            Viewpoint3d.orbitZ
-                { focalPoint = Point3d.origin
-                , azimuth = model.azimuth
-                , elevation = model.elevation
-                , distance = Length.meters 1.8
-                }
-
-        camera =
-            Camera3d.perspective
-                { viewpoint = viewpoint
-                , verticalFieldOfView = Angle.degrees 30
-                }
-
-        -- Used for converting from coordinates relative to the bottom-left
-        -- corner of the 2D drawing into coordinates relative to the top-left
-        -- corner (which is what SVG natively works in)
-        topLeftFrame =
-            Frame2d.atPoint (Point2d.xy Quantity.zero (Pixels.float model.viewportInfo.viewport.height))
-                |> Frame2d.reverseY
-
-        -- Defines the shape of the 'screen' that we will be using when
-        -- projecting 3D points into 2D
-        screenRectangle =
-            Rectangle2d.from Point2d.origin (Point2d.pixels model.viewportInfo.viewport.width model.viewportInfo.viewport.height)
-            |> Rectangle2d.relativeTo topLeftFrame
-            
-
-
         blockDistanceFromPointer block =
             Point2d.distanceFrom
-                (Point3d.toScreenSpace camera screenRectangle block.position)
+                (Point3d.toScreenSpace (camera model) (screenRectangle model |> Rectangle2d.relativeTo (topLeftFrame model)) block.position)
                 (Point2d.xy model.pointerX model.pointerY)
             |> Pixels.toFloat
 
@@ -282,9 +268,9 @@ blockNearestToMouse model =
             List.map (\b -> (blockDistanceFromPointer b, b)) allBlocks
 
         nearbyBlocksWithDistance =
-            List.filter (\(d, _) -> d < 50) blocksWithDistance
+            List.filter (\(d, _) -> d < 100) blocksWithDistance
     in
-    List.Extra.maximumBy Tuple.first nearbyBlocksWithDistance
+    List.Extra.minimumBy Tuple.first nearbyBlocksWithDistance
     |> Maybe.map Tuple.second
 
 
@@ -346,18 +332,27 @@ update message model =
                             |> Quantity.clamp (Angle.degrees -90) (Angle.degrees 90)
                 in
                 ( { model | azimuth = newAzimuth, elevation = newElevation, hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation
-                    , pointerX = x, pointerY = y
+                    , pointerX = x, pointerY = y, blockNearMouse = Nothing
                     }
                 , Cmd.none
                 )
 
             else
-                ( { model | hoverAzimuth = hoverAzimuth, hoverElevation = hoverElevation, pointerX = x, pointerY = y, blockNearMouse = blockNearestToMouse model} -- disable for now
+                ( { model | 
+                    hoverAzimuth = hoverAzimuth
+                    , hoverElevation = hoverElevation
+                    , pointerX = x
+                    , pointerY = y
+                    , blockNearMouse = blockNearestToMouse {model | pointerX = x, pointerY = y }
+                    }
                 , Cmd.none
                 )
 
         GotViewport viewportInfo ->
             ( { model | viewportInfo = viewportInfo}, Cmd.none)
+
+        Scroll {deltaY} ->
+            ( { model | distance = Quantity.plus model.distance (Length.millimeters deltaY) }, Cmd.none)
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
@@ -392,55 +387,57 @@ subscriptions model =
         -- Browser.Events.onMouseDown (Decode.succeed MouseDown)
 
 
+
+-- Create a viewpoint by orbiting around a Z axis through the given
+-- focal point, with azimuth measured from the positive X direction
+-- towards positive Y
+viewpoint model =
+    Viewpoint3d.orbitZ
+        { focalPoint = Point3d.origin
+        , azimuth = model.azimuth
+        , elevation = model.elevation
+        , distance = model.distance
+        }
+
+
+camera model =
+    Camera3d.perspective
+        { viewpoint = viewpoint model
+        , verticalFieldOfView = Angle.degrees 30
+        }
+
+
+-- Used for converting from coordinates relative to the bottom-left
+-- corner of the 2D drawing into coordinates relative to the top-left
+-- corner (which is what SVG natively works in)
+topLeftFrame model =
+    Frame2d.atPoint (Point2d.xy Quantity.zero (Pixels.float model.viewportInfo.viewport.height))
+        |> Frame2d.reverseY
+
+
+-- Defines the shape of the 'screen' that we will be using when
+-- projecting 3D points into 2D
+screenRectangle model =
+    Rectangle2d.from Point2d.origin (Point2d.pixels model.viewportInfo.viewport.width model.viewportInfo.viewport.height)
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
-        -- Create a viewpoint by orbiting around a Z axis through the given
-        -- focal point, with azimuth measured from the positive X direction
-        -- towards positive Y
-        viewpoint =
-            Viewpoint3d.orbitZ
-                { focalPoint = Point3d.origin
-                , azimuth = model.azimuth
-                , elevation = model.elevation
-                , distance = model.distance
-                }
-
-        camera =
-            Camera3d.perspective
-                { viewpoint = viewpoint
-                , verticalFieldOfView = Angle.degrees 30
-                }
-
-        -- Used for converting from coordinates relative to the bottom-left
-        -- corner of the 2D drawing into coordinates relative to the top-left
-        -- corner (which is what SVG natively works in)
-        topLeftFrame =
-            Frame2d.atPoint (Point2d.xy Quantity.zero (Pixels.float model.viewportInfo.viewport.height))
-                |> Frame2d.reverseY
-
-        -- Defines the shape of the 'screen' that we will be using when
-        -- projecting 3D points into 2D
-        screenRectangle =
-            Rectangle2d.from Point2d.origin (Point2d.pixels model.viewportInfo.viewport.width model.viewportInfo.viewport.height)
-
         -- Take all vertices of the logo shape, rotate them the same amount as
         -- the logo itself and then project them into 2D screen space
         vertices2d =
             allBlocks
                 |> List.map .position
                 --|> List.map (Point3d.rotateAround Axis3d.z angle)
-                |> List.map (Point3d.toScreenSpace camera screenRectangle)
+                |> List.map (Point3d.toScreenSpace (camera model) (screenRectangle model))
 
         -- Create text SVG labels beside each projected 2D point
-        svgLabels =
-            List.map blockToSvgLabel allBlocks
-
         blockToSvgLabel : Block -> Svg msg
         blockToSvgLabel block =
             let
                 vertex =
-                    Point3d.toScreenSpace camera screenRectangle block.position
+                    Point3d.toScreenSpace (camera model) (screenRectangle model) block.position
             in
             Svg.text_
                 [ Svg.Attributes.fill "rgb(92, 92, 92)"
@@ -448,15 +445,28 @@ view model =
                 , Svg.Attributes.fontSize "12px"
                 , Svg.Attributes.stroke "none"
                 , Svg.Attributes.style "user-select: none"
-                , Svg.Attributes.x (String.fromFloat (Pixels.toFloat (Point2d.xCoordinate vertex)))
-                , Svg.Attributes.y (String.fromFloat (Pixels.toFloat (Point2d.yCoordinate vertex)))
-                , Svg.Attributes.width "3em"
+                , Svg.Attributes.x (String.fromFloat (Pixels.toFloat (Point2d.xCoordinate vertex) - 4))
+                , Svg.Attributes.y (String.fromFloat (Pixels.toFloat (Point2d.yCoordinate vertex) + 4))
                 ]
-                [ Svg.text (block.description) ]
+                [ Svg.text (String.fromInt <| block.column + 1) ]
                 -- Hack: flip the text upside down since our later
                 -- 'Svg.relativeTo topLeftFrame' call will flip it
                 -- back right side up
                 |> Svg.mirrorAcross (Axis2d.through vertex Direction2d.x)
+
+        blockToSvgCircle : Block -> Svg msg
+        blockToSvgCircle block =
+            let
+                vertex =
+                    Point3d.toScreenSpace (camera model) (screenRectangle model) block.position
+            in
+            Svg.circle2d
+                [ Svg.Attributes.stroke "grey"
+                , Svg.Attributes.strokeWidth "2"
+                , Svg.Attributes.fill "none"
+                ]
+                (Circle2d.withRadius (Pixels.float 6) vertex)
+
 
     in
     { title = "CCSMM Cube"
@@ -465,6 +475,7 @@ view model =
             [ if model.dragging then Html.Attributes.style "cursor" "grabbing" else Html.Attributes.style "cursor" "grab"
             , Html.Attributes.classList 
                 [ ("aligned", Quantity.equalWithin (Angle.degrees 5) model.azimuth (Angle.degrees 114) && Quantity.equalWithin (Angle.degrees 5) model.elevation (Angle.degrees 23)) ]
+            , Wheel.onWheel Scroll
             ]
             [   Scene3d.sunny
                 { upDirection = Direction3d.positiveZ
@@ -472,7 +483,7 @@ view model =
                     (Quantity.difference (Quantity.plus model.azimuth (Angle.degrees 45)) model.hoverAzimuth) 
                     (Quantity.difference (Quantity.plus model.elevation (Angle.degrees 200)) model.hoverElevation) --(Angle.degrees 45) ((Angle.degrees 200)) 
                 , shadows = True
-                , camera = camera
+                , camera = camera model
                 , clipDepth = Length.meters 0.1
                 , dimensions = ( Pixels.int (round model.viewportInfo.viewport.width), Pixels.int (round model.viewportInfo.viewport.height) )
                 , background = Scene3d.transparentBackground
@@ -481,15 +492,16 @@ view model =
                     -- , floor
                     ]
                 }
+            -- , Svg.svg
+            --     [ Svg.Attributes.width (String.fromFloat model.viewportInfo.viewport.width)
+            --     , Svg.Attributes.height (String.fromFloat model.viewportInfo.viewport.height)
+            --     , Svg.Attributes.style "position: absolute; top: 0; left: 0; right: 0; bottom: 0;"
+            --     ]
+            --     [ Svg.relativeTo (topLeftFrame model)
+            --         (Svg.g [] (List.map blockToSvgLabel allBlocks))
+            --     ]
             ]
-        , Svg.svg
-                [ Svg.Attributes.width (String.fromFloat model.viewportInfo.viewport.width)
-                , Svg.Attributes.height (String.fromFloat model.viewportInfo.viewport.height)
-                , Svg.Attributes.style "position: absolute; top: 0; left: 0; right: 0; bottom: 0;"
-                ]
-                [ Svg.relativeTo topLeftFrame
-                    (Svg.g [] (svgLabels))
-                ]
+        
         ]
     }
 
