@@ -611,9 +611,10 @@ view model =
     { title = "CCSMM Cube"
     , body =
         [ Html.main_ 
-            [ if model.dragging then Html.Attributes.style "cursor" "grabbing" else Html.Attributes.style "cursor" "grab"
-            , Wheel.onWheel Scroll
-            ]
+            (if model.dragging then
+                [Html.Attributes.style "cursor" "grabbing", Wheel.onWheel Scroll] 
+            else [Html.Attributes.style "cursor" "grab"]
+            )
             [   Scene3d.sunny
                 { upDirection = Direction3d.positiveZ
                 , sunlightDirection = Direction3d.xyZ 

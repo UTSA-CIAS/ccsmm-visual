@@ -13490,10 +13490,13 @@ var $author$project$Main$view = function (model) {
 			[
 				A2(
 				$elm$html$Html$main_,
-				_List_fromArray(
+				model.aT ? _List_fromArray(
 					[
-						model.aT ? A2($elm$html$Html$Attributes$style, 'cursor', 'grabbing') : A2($elm$html$Html$Attributes$style, 'cursor', 'grab'),
+						A2($elm$html$Html$Attributes$style, 'cursor', 'grabbing'),
 						$mpizenberg$elm_pointer_events$Html$Events$Extra$Wheel$onWheel($author$project$Main$Scroll)
+					]) : _List_fromArray(
+					[
+						A2($elm$html$Html$Attributes$style, 'cursor', 'grab')
 					]),
 				_List_fromArray(
 					[
