@@ -294,7 +294,7 @@ blockNearestToMouse model =
             List.map (\b -> (blockDistanceFromPointer b, b)) allFocusedBlocks
 
         nearbyBlocksWithDistance =
-            List.filter (\(d, _) -> d < 100) blocksWithDistance
+            List.filter (\(d, _) -> d < 75) blocksWithDistance
     in
     List.Extra.minimumBy Tuple.first nearbyBlocksWithDistance
     |> Maybe.map Tuple.second
@@ -484,7 +484,7 @@ update message model =
             ( { model | viewportInfo = viewportInfo}, Cmd.none)
 
         Scroll {deltaY} ->
-            ( { model | distance = Quantity.plus model.distance (Length.millimeters deltaY) }, Cmd.none)
+            ( { model | distance = Quantity.clamp (Length.meters 1) (Length.meters 2) (Quantity.plus model.distance (Length.millimeters deltaY)) }, Cmd.none)
 
         ToggleAspectFocus aspect ->
             ( { model | focusedAspect = 
@@ -613,7 +613,10 @@ view model =
         [ Html.main_ 
             (if model.dragging then
                 [Html.Attributes.style "cursor" "grabbing", Wheel.onWheel Scroll] 
-            else [Html.Attributes.style "cursor" "grab"]
+            else if model.blockNearMouse /= Nothing then
+                [Html.Attributes.style "cursor" "help"]
+            else 
+                [Html.Attributes.style "cursor" "grab"]
             )
             [   Scene3d.sunny
                 { upDirection = Direction3d.positiveZ

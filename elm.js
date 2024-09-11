@@ -2719,7 +2719,7 @@ var _VirtualDom_mapEventTuple = F2(function(func, tuple)
 var _VirtualDom_mapEventRecord = F2(function(func, record)
 {
 	return {
-		av: func(record.av),
+		aw: func(record.aw),
 		c0: record.c0,
 		cT: record.cT
 	}
@@ -2992,7 +2992,7 @@ function _VirtualDom_makeCallback(eventNode, initialHandler)
 		// 3 = Custom
 
 		var value = result.a;
-		var message = !tag ? value : tag < 3 ? value.a : value.av;
+		var message = !tag ? value : tag < 3 ? value.a : value.aw;
 		var stopPropagation = tag == 1 ? value.b : tag == 3 && value.c0;
 		var currentEventNode = (
 			stopPropagation && event.stopPropagation(),
@@ -4326,7 +4326,7 @@ function _Browser_getViewport()
 			fU: _Browser_window.pageXOffset,
 			fY: _Browser_window.pageYOffset,
 			aP: _Browser_doc.documentElement.clientWidth,
-			as: _Browser_doc.documentElement.clientHeight
+			at: _Browser_doc.documentElement.clientHeight
 		}
 	};
 }
@@ -4337,7 +4337,7 @@ function _Browser_getScene()
 	var elem = _Browser_doc.documentElement;
 	return {
 		aP: Math.max(body.scrollWidth, body.offsetWidth, elem.scrollWidth, elem.offsetWidth, elem.clientWidth),
-		as: Math.max(body.scrollHeight, body.offsetHeight, elem.scrollHeight, elem.offsetHeight, elem.clientHeight)
+		at: Math.max(body.scrollHeight, body.offsetHeight, elem.scrollHeight, elem.offsetHeight, elem.clientHeight)
 	};
 }
 
@@ -4362,13 +4362,13 @@ function _Browser_getViewportOf(id)
 		return {
 			fw: {
 				aP: node.scrollWidth,
-				as: node.scrollHeight
+				at: node.scrollHeight
 			},
 			W: {
 				fU: node.scrollLeft,
 				fY: node.scrollTop,
 				aP: node.clientWidth,
-				as: node.clientHeight
+				at: node.clientHeight
 			}
 		};
 	});
@@ -4403,13 +4403,13 @@ function _Browser_getElement(id)
 				fU: x,
 				fY: y,
 				aP: _Browser_doc.documentElement.clientWidth,
-				as: _Browser_doc.documentElement.clientHeight
+				at: _Browser_doc.documentElement.clientHeight
 			},
 			eU: {
 				fU: x + rect.left,
 				fY: y + rect.top,
 				aP: rect.width,
-				as: rect.height
+				at: rect.height
 			}
 		};
 	});
@@ -7404,7 +7404,7 @@ var $author$project$Main$init = function (_v0) {
 	return _Utils_Tuple2(
 		{
 			ap: $ianmackenzie$elm_units$Angle$degrees(114),
-			aE: $elm$core$Maybe$Nothing,
+			aq: $elm$core$Maybe$Nothing,
 			aS: $ianmackenzie$elm_units$Length$meters(1.8),
 			aT: false,
 			Z: $ianmackenzie$elm_units$Angle$degrees(23),
@@ -7416,8 +7416,8 @@ var $author$project$Main$init = function (_v0) {
 			a2: $ianmackenzie$elm_units$Pixels$float(0),
 			a3: $ianmackenzie$elm_units$Pixels$float(0),
 			N: {
-				fw: {as: 600, aP: 800},
-				W: {as: 600, aP: 800, fU: 0, fY: 0}
+				fw: {at: 600, aP: 800},
+				W: {at: 600, aP: 800, fU: 0, fY: 0}
 			}
 		},
 		A2($elm$core$Task$perform, $author$project$Main$GotViewport, $elm$browser$Browser$Dom$getViewport));
@@ -8611,7 +8611,7 @@ var $author$project$Main$screenRectangle = function (model) {
 	return A2(
 		$ianmackenzie$elm_geometry$Rectangle2d$from,
 		$ianmackenzie$elm_geometry$Point2d$origin,
-		A2($ianmackenzie$elm_geometry$Point2d$pixels, model.N.W.aP, model.N.W.as));
+		A2($ianmackenzie$elm_geometry$Point2d$pixels, model.N.W.aP, model.N.W.at));
 };
 var $elm$core$Tuple$second = function (_v0) {
 	var y = _v0.b;
@@ -8737,7 +8737,7 @@ var $author$project$Main$topLeftFrame = function (model) {
 			A2(
 				$ianmackenzie$elm_geometry$Point2d$xy,
 				$ianmackenzie$elm_units$Quantity$zero,
-				$ianmackenzie$elm_units$Pixels$float(model.N.W.as))));
+				$ianmackenzie$elm_units$Pixels$float(model.N.W.at))));
 };
 var $author$project$Main$blockNearestToMouse = function (model) {
 	var blockDistanceFromPointer = function (block) {
@@ -8779,7 +8779,7 @@ var $author$project$Main$blockNearestToMouse = function (model) {
 		$elm$core$List$filter,
 		function (_v0) {
 			var d = _v0.a;
-			return d < 100;
+			return d < 75;
 		},
 		blocksWithDistance);
 	return A2(
@@ -8854,7 +8854,7 @@ var $author$project$Main$update = F2(
 				var x = message.c;
 				var y = message.d;
 				var tiltRange = 90;
-				var portionFromYBottom = (model.N.W.as - $ianmackenzie$elm_units$Pixels$toFloat(y)) / model.N.W.as;
+				var portionFromYBottom = (model.N.W.at - $ianmackenzie$elm_units$Pixels$toFloat(y)) / model.N.W.at;
 				var portionFromXRight = (model.N.W.aP - $ianmackenzie$elm_units$Pixels$toFloat(x)) / model.N.W.aP;
 				var hoverElevation = $ianmackenzie$elm_units$Angle$normalize(
 					$ianmackenzie$elm_units$Angle$degrees((tiltRange / 2) - (portionFromYBottom * tiltRange)));
@@ -8886,14 +8886,14 @@ var $author$project$Main$update = F2(
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
-							{ap: newAzimuth, aE: $elm$core$Maybe$Nothing, Z: newElevation, bn: hoverAzimuth, bo: hoverElevation, a2: x, a3: y}),
+							{ap: newAzimuth, aq: $elm$core$Maybe$Nothing, Z: newElevation, bn: hoverAzimuth, bo: hoverElevation, a2: x, a3: y}),
 						$elm$core$Platform$Cmd$none);
 				} else {
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
 							{
-								aE: $author$project$Main$blockNearestToMouse(
+								aq: $author$project$Main$blockNearestToMouse(
 									_Utils_update(
 										model,
 										{a2: x, a3: y})),
@@ -8917,10 +8917,14 @@ var $author$project$Main$update = F2(
 					_Utils_update(
 						model,
 						{
-							aS: A2(
-								$ianmackenzie$elm_units$Quantity$plus,
-								model.aS,
-								$ianmackenzie$elm_units$Length$millimeters(deltaY))
+							aS: A3(
+								$ianmackenzie$elm_units$Quantity$clamp,
+								$ianmackenzie$elm_units$Length$meters(1),
+								$ianmackenzie$elm_units$Length$meters(2),
+								A2(
+									$ianmackenzie$elm_units$Quantity$plus,
+									model.aS,
+									$ianmackenzie$elm_units$Length$millimeters(deltaY)))
 						}),
 					$elm$core$Platform$Cmd$none);
 			default:
@@ -9180,7 +9184,7 @@ var $author$project$Main$aspectLabels = function (model) {
 						A2(
 							$elm$core$Maybe$withDefault,
 							'normal',
-							A2($elm$core$Maybe$map, weightMatchesHoverBlock, model.aE))),
+							A2($elm$core$Maybe$map, weightMatchesHoverBlock, model.aq))),
 						$elm$svg$Svg$Attributes$textDecoration(decorationMatchesFocus),
 						$elm$svg$Svg$Attributes$stroke('none'),
 						$elm$svg$Svg$Attributes$style('user-select: none; cursor: pointer'),
@@ -11928,12 +11932,12 @@ var $author$project$Main$blockToEntity = F2(
 		var blockMaterial = $ianmackenzie$elm_3d_scene$Scene3d$Material$nonmetal(
 			{ey: columnColor, fv: 0});
 		return _Utils_eq(
-			model.aE,
+			model.aq,
 			$elm$core$Maybe$Just(block)) ? A2($ianmackenzie$elm_3d_scene$Scene3d$blockWithShadow, blockMaterial, block.bd) : (A2($author$project$Main$blockMatchesFocusedAspect, block, model) ? A2(
 			$ianmackenzie$elm_3d_scene$Scene3d$mesh,
 			$ianmackenzie$elm_3d_scene$Scene3d$Material$color(columnColor),
 			$ianmackenzie$elm_3d_scene$Scene3d$Mesh$lineSegments(
-				$ianmackenzie$elm_geometry$Block3d$edges(block.bd))) : ((_Utils_eq(model.aE, $elm$core$Maybe$Nothing) && _Utils_eq(model.V, $elm$core$Maybe$Nothing)) ? A2($ianmackenzie$elm_3d_scene$Scene3d$blockWithShadow, blockMaterial, block.bd) : (_Utils_eq(model.V, $elm$core$Maybe$Nothing) ? A3(
+				$ianmackenzie$elm_geometry$Block3d$edges(block.bd))) : ((_Utils_eq(model.aq, $elm$core$Maybe$Nothing) && _Utils_eq(model.V, $elm$core$Maybe$Nothing)) ? A2($ianmackenzie$elm_3d_scene$Scene3d$blockWithShadow, blockMaterial, block.bd) : (_Utils_eq(model.V, $elm$core$Maybe$Nothing) ? A3(
 			$ianmackenzie$elm_3d_scene$Scene3d$point,
 			{
 				ee: $ianmackenzie$elm_units$Pixels$float(10)
@@ -12085,7 +12089,7 @@ var $mpizenberg$elm_pointer_events$Html$Events$Extra$Wheel$onWithOptions = F2(
 				$elm$json$Json$Decode$map,
 				function (ev) {
 					return {
-						av: tag(ev),
+						aw: tag(ev),
 						cT: options.cT,
 						c0: options.c0
 					};
@@ -12933,7 +12937,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$toWebGLEntities = function (_arguments) {
 			$ianmackenzie$elm_geometry$Direction3d$reverse(
 				$ianmackenzie$elm_3d_camera$Viewpoint3d$viewDirection(viewpoint)));
 		var _v3 = function () {
-			var _v4 = _arguments.az;
+			var _v4 = _arguments.aA;
 			switch (_v4.$) {
 				case 0:
 					return _Utils_Tuple2(0, 0);
@@ -12953,9 +12957,9 @@ var $ianmackenzie$elm_3d_scene$Scene3d$toWebGLEntities = function (_arguments) {
 		}();
 		var toneMapType = _v3.a;
 		var toneMapParam = _v3.b;
-		var _v5 = _arguments.ar;
+		var _v5 = _arguments.as;
 		var exposureLuminance = _v5;
-		var _v6 = A2($ianmackenzie$elm_3d_scene$Scene3d$ColorConversions$chromaticityToLinearRgb, exposureLuminance, _arguments.aC);
+		var _v6 = A2($ianmackenzie$elm_3d_scene$Scene3d$ColorConversions$chromaticityToLinearRgb, exposureLuminance, _arguments.aD);
 		var referenceWhite = _v6;
 		var sceneProperties = $elm_explorations$linear_algebra$Math$Matrix4$fromRecord(
 			{
@@ -12984,7 +12988,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$toWebGLEntities = function (_arguments) {
 			$ianmackenzie$elm_3d_scene$Scene3d$Transformation$identity,
 			rootNode,
 			{P: _List_Nil, Y: _List_Nil, fy: _List_Nil});
-		var _v7 = _arguments.au;
+		var _v7 = _arguments.av;
 		switch (_v7.$) {
 			case 0:
 				var lightMatrices = _v7.a;
@@ -13089,7 +13093,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$composite = F2(
 			$elm$core$List$concatMap,
 			function (scene) {
 				return $ianmackenzie$elm_3d_scene$Scene3d$toWebGLEntities(
-					{ev: aspectRatio, eB: _arguments.eB, eI: _arguments.eI, eW: scene.eW, ar: scene.ar, au: scene.au, em: scalingFactor, az: scene.az, aC: scene.aC});
+					{ev: aspectRatio, eB: _arguments.eB, eI: _arguments.eI, eW: scene.eW, as: scene.as, av: scene.av, em: scalingFactor, aA: scene.aA, aD: scene.aD});
 			},
 			scenes);
 		var widthCss = A2(
@@ -13135,7 +13139,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$custom = function (_arguments) {
 		{aR: _arguments.aR, ex: _arguments.ex, eB: _arguments.eB, eI: _arguments.eI, eQ: _arguments.eQ},
 		_List_fromArray(
 			[
-				{eW: _arguments.eW, ar: _arguments.ar, au: _arguments.au, az: _arguments.az, aC: _arguments.aC}
+				{eW: _arguments.eW, as: _arguments.as, av: _arguments.av, aA: _arguments.aA, aD: _arguments.aD}
 			]));
 };
 var $ianmackenzie$elm_3d_scene$Scene3d$Types$Chromaticity = $elm$core$Basics$identity;
@@ -13383,10 +13387,10 @@ var $ianmackenzie$elm_3d_scene$Scene3d$sunny = function (_arguments) {
 			eI: _arguments.eI,
 			eQ: _arguments.eQ,
 			eW: _arguments.eW,
-			ar: $ianmackenzie$elm_3d_scene$Scene3d$exposureValue(15),
-			au: lights,
-			az: $ianmackenzie$elm_3d_scene$Scene3d$noToneMapping,
-			aC: $ianmackenzie$elm_3d_scene$Scene3d$Light$daylight
+			as: $ianmackenzie$elm_3d_scene$Scene3d$exposureValue(15),
+			av: lights,
+			aA: $ianmackenzie$elm_3d_scene$Scene3d$noToneMapping,
+			aD: $ianmackenzie$elm_3d_scene$Scene3d$Light$daylight
 		});
 };
 var $elm$svg$Svg$svg = $elm$svg$Svg$trustedNode('svg');
@@ -13494,10 +13498,13 @@ var $author$project$Main$view = function (model) {
 					[
 						A2($elm$html$Html$Attributes$style, 'cursor', 'grabbing'),
 						$mpizenberg$elm_pointer_events$Html$Events$Extra$Wheel$onWheel($author$project$Main$Scroll)
+					]) : ((!_Utils_eq(model.aq, $elm$core$Maybe$Nothing)) ? _List_fromArray(
+					[
+						A2($elm$html$Html$Attributes$style, 'cursor', 'help')
 					]) : _List_fromArray(
 					[
 						A2($elm$html$Html$Attributes$style, 'cursor', 'grab')
-					]),
+					])),
 				_List_fromArray(
 					[
 						$ianmackenzie$elm_3d_scene$Scene3d$sunny(
@@ -13509,7 +13516,7 @@ var $author$project$Main$view = function (model) {
 								$ianmackenzie$elm_units$Pixels$int(
 									$elm$core$Basics$round(model.N.W.aP)),
 								$ianmackenzie$elm_units$Pixels$int(
-									$elm$core$Basics$round(model.N.W.as))),
+									$elm$core$Basics$round(model.N.W.at))),
 							eW: _List_fromArray(
 								[
 									$author$project$Main$entireCube(model)
@@ -13540,7 +13547,7 @@ var $author$project$Main$view = function (model) {
 								$elm$svg$Svg$Attributes$width(
 								$elm$core$String$fromFloat(model.N.W.aP)),
 								$elm$svg$Svg$Attributes$height(
-								$elm$core$String$fromFloat(model.N.W.as)),
+								$elm$core$String$fromFloat(model.N.W.at)),
 								$elm$svg$Svg$Attributes$style('position: absolute; top: 0; left: 0; right: 0; bottom: 0;')
 							]),
 						_List_fromArray(
